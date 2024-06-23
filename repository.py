@@ -1,22 +1,11 @@
 import os.path
 import uuid
-from dataclasses import dataclass
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct, VectorParams, Distance
 from sentence_transformers import SentenceTransformer
 
-from langauge_parser import is_support_file
-
-
-@dataclass
-class Document:
-    chunk_id: str
-    path: str
-    content: str
-    score: float
-    start_line: int
-    end_line: int
+from splitter import is_support_file, Document
 
 
 class Index:
