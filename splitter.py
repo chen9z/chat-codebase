@@ -73,55 +73,42 @@ class JavaSplitter(Splitter):
 
         root_node = tree.root_node
         chunks = []
-        if not root_node or tree.root_node.type == "ERROR":
-            logging.error(f"Failed to parse {path}")
-            return chunks
-        chunks = self.traverse_node(root_node)
-
-        start = root_node.start_byte
-        end = root_node.end_byte
-
-        print(str(tree))
-        print(tree.root_node)
-        print(tree.root_node.text)
-        print(tree.root_node.start_byte)
-        print(tree.root_node.end_byte)
+        self.chunk_node(root_node, chunks,  0)
         return chunks
 
-    def traverse_node(self, node) -> list[Document]:
-        chunks = []
+    def chunk_node(self, node, chunks, start_line):
         if not node or node.type == "ERROR":
             logging.error(f"Failed to parse {path}")
-            return chunks
+            return
 
-        return self.chunk_node(node, chunks)
-
-    def chunk_node(self, node, chunks: list[Document]) -> list[Document]:
         start = node.start_byte
-        end = node.end_byte
-        if end - start < self.chunk_size:
+        if node.end_byte - start < self.chunk_size:
             chunks.append(
                 Document(chunk_id=uuid.uuid4().__str__(), path=path, content=node.text, score=0.0, start_line=0,
-                         end_line=node.text.splitlines() + 1))
-            return chunks
-        if not node or node.type == "ERROR":
-            logging.error(f"Failed to parse {path}")
-            return chunks
-        if node.type == "block_comment" and node.start_byte == 0:
-            print(f"license_block_comment: {node.text}")
-        elif node.type == "package_declaration":
-            print(f"package_declaration: {node.text}")
-        elif node.type == "block_comment":
-            print(f"block_comment: {node.text}")
-        elif node.type == "class_declaration":
-            print(f"class_declaration {node.text}")
-        if node.child_count == 0:
-            return chunks
+                         end_line=len(node.text.splitlines()) + 1))
+            return
+
+        for child in node.children:
+            if child.type == "block_comment" and child.start_byte == 0:
+                continue
+            if child.type == "package_declaration":
+                start = child.start_byte
+                start_line = len(node.text[:child.start_byte].splitlines()) + 1
+                continue
+            if child.end_byte - start > self.chunk_size:
+                end_line = len(node.text[start:child.start_byte - 1].splitlines()) + start_line
+                chunks.append(
+                    Document(chunk_id=uuid.uuid4().__str__(), path=path, content=node.text[start:child.start_byte - 1],
+                             score=0.0, start_line=start_line, end_line=end_line))
+                start = child.start_byte
+                start_line = end_line + 1
+            if child.type == "class_declaration":
+                self.chunk_node(child, chunks, start_line)
 
 
 def get_parse(language: str) -> Splitter:
     if language == ".java":
-        return JavaSplitter(chunk_size=200, chunk_overlap=20)
+        return JavaSplitter(chunk_size=500, chunk_overlap=20)
     else:
         return Splitter(chunk_size=200, chunk_overlap=100)
 
@@ -142,4 +129,6 @@ if __name__ == '__main__':
     path = os.path.expanduser(
         "~/workspace/spring-ai/spring-ai-core/src/main/java/org/springframework/ai/chat/memory/InMemoryChatMemory.java")
     parser = get_parse(os.path.splitext(path)[1])
-    parser.split(path)
+    chunks = parser.split(path)
+    for chunk in chunks:
+        print(chunk)
