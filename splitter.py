@@ -2,7 +2,7 @@ import logging
 import os
 import uuid
 import tree_sitter_java as ts_java
-from tree_sitter import Language, Parser, Node
+from tree_sitter import Language, Parser, Node,Tree,TreeCursor
 from dataclasses import dataclass
 
 
@@ -68,43 +68,60 @@ class JavaSplitter(Splitter):
         self.chunk_overlap = chunk_overlap
 
     def split(self, path: str) -> list[Document]:
-        paser = Parser(Language(ts_java.language()))
-        tree = paser.parse(bytes(get_content(path), "utf-8"))
+        parser = Parser(Language(ts_java.language()))
+        tree = parser.parse(bytes(get_content(path), "utf-8"))
 
         root_node = tree.root_node
-        return self._chunk_node(root_node, "", 0, 0)
+        return self._chunk_node(root_node, "", path)
 
-    def _chunk_node(self, node, content, start_line, chunk_line):
+    def _chunk_node(self, node, start_line, path):
         if not node or node.type == "ERROR":
             logging.error(f"Failed to parse {path}")
             return []
 
         chunks = []
-        start_line = start_line
-        current_chunk = node.text.decode("utf-8")
+        current_chunk = ""
+        current_start_line = start_line
 
-        if node.end_byte - node.start_byte + len(current_chunk) < self.chunk_size:
-            chunks.append(
-                Document(chunk_id=uuid.uuid4().__str__(), path=path, content=current_chunk, start_line=start_line,
-                         end_line=start_line + chunk_line, score=0.0))
-            return chunks
-        else:
-            for child in node.children:
-                if child.type == "method_declaration":
-                    if current_chunk:
-                        chunks.append(
-                            Document(chunk_id=uuid.uuid4().__str__(), path=path, content=current_chunk,
-                                     start_line=start_line, end_line=start_line + chunk_line, score=0.0))
-                        current_chunk = ""
-                        chunk_line = 0
-                        start_line = start_line + chunk_line + 1
-                    else:
-                        return chunks.extend(self._chunk_node(child, current_chunk, start_line, chunk_line))
+        def create_document(chunk, s_line, e_line):
+            return Document(
+                chunk_id=str(uuid.uuid4()),
+                path=path,
+                content=chunk,
+                start_line=s_line,
+                end_line=e_line,
+                score=0.0
+            )
+
+        for child in node.children:
+            child_text = child.text.decode("utf-8")
+            child_length = len(child_text)
+
+            if len(current_chunk) + child_length > self.chunk_size:
+                if current_chunk:
+                    chunks.append(create_document(current_chunk, current_start_line, child.start_point[0]))
+                    current_chunk = child_text
+                    current_start_line = max(child.start_point[0] - 1, current_start_line)
+
+                if child_length > self.chunk_size:
+                    child_chunks = self._chunk_node(child, current_start_line, path)
+                    chunks.extend(child_chunks)
+                    current_chunk = ""
+                    current_start_line = child.end_point[0]
+                else:
+                    current_chunk += child_text
+            else:
+                current_chunk += child_text
+
+        if current_chunk:
+            chunks.append(create_document(current_chunk, current_start_line, node.end_point[0]))
+
+        return chunks
 
 
 def get_parse(language: str) -> Splitter:
     if language == ".java":
-        return JavaSplitter(chunk_size=500, chunk_overlap=20)
+        return JavaSplitter(chunk_size=200, chunk_overlap=20)
     else:
         return Splitter(chunk_size=200, chunk_overlap=100)
 
@@ -127,4 +144,4 @@ if __name__ == '__main__':
     parser = get_parse(os.path.splitext(path)[1])
     results = parser.split(path)
     for chunk in results:
-        print(chunk)
+        print(chunk.content)
