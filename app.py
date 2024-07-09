@@ -34,12 +34,12 @@ if __name__ == '__main__':
         prompt = input("请输入问题：")
         if prompt == "exit":
             break
-        result = index.query_documents(project_name, prompt, limit=20)
+        documents = index.query_documents(project_name, prompt, limit=20)
         context = ""
-        for doc in result:
+        for doc in documents:
             context += f"file:///{doc.path} \n" + doc.content
 
-        response = get_response(model="gemma2:9b-instruct-q6_K",
+        response = get_response(model="qwen2:7b-instruct-q6_K",
                                 messages=[{"role": "system", "content": system_template},
                                           {"role": "user", "content": user_template.format(context=context,
                                                                                            question=prompt)}])

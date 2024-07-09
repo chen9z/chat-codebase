@@ -1,10 +1,10 @@
 import os.path
-import uuid
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct, VectorParams, Distance
 from sentence_transformers import SentenceTransformer
 
+import splitter
 from splitter import is_support_file, Document
 
 
@@ -36,16 +36,12 @@ class Index:
         file_paths = traverse_files(project_dir)
         for file_path in file_paths:
             if is_support_file(file_path):
-                with open(file_path, "r", errors="ignore") as f:
-                    content = f.read()
-                    embeddings = self.model.encode(content, show_progress_bar=True)
-                    text_id = str(uuid.uuid4())
-
-                    doc = Document(chunk_id=text_id, path=file_path, content=content, score=0.0, start_line=0,
-                                   end_line=0)
-
-                    point = PointStruct(id=text_id, vector=embeddings.tolist(),
-                                        payload=doc.__dict__)
+                documents = splitter.parse(file_path)
+                for document in documents:
+                    # print(f"=====encode file {document.path}")
+                    embeddings = self.model.encode(document.content, show_progress_bar=True)
+                    point = PointStruct(id=document.chunk_id, vector=embeddings.tolist(),
+                                        payload=document.__dict__)
                     points.append(point)
         operation = self.vector_client.upsert(collection_name=project_name, points=points, wait=True)
         if operation.status == "completed":

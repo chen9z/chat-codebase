@@ -1,9 +1,10 @@
 import logging
 import os
 import uuid
-import tree_sitter_java as ts_java
-from tree_sitter import Language, Parser, Node, Tree, TreeCursor
 from dataclasses import dataclass
+
+import tree_sitter_java as ts_java
+from tree_sitter import Language, Parser
 
 
 @dataclass
@@ -26,44 +27,62 @@ def get_content(path: str) -> str:
 
 
 class Splitter:
-
     def __init__(self, chunk_size: int = 2000, chunk_overlap: int = 100):
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
 
     def split(self, path: str) -> list[Document]:
         chunks = []
-        with open(path, "r") as file:
-            total_token = 0
-            cache_line = []
-            for index, line in enumerate(file):
-                line_tokens = line.split()
-                if total_token + len(line_tokens) > self.chunk_size:
-                    chunks.append(
-                        Document(chunk_id=uuid.uuid4().__str__(), path=path, content="".join(cache_line), score=0.0,
-                                 start_line=index - len(cache_line), end_line=index))
-                    cache_line = []
-                    total_token = 0
-                    continue
-                cache_line.append(line)
-                total_token += len(line_tokens)
-            if cache_line:
-                chunks.append(
-                    Document(chunk_id=uuid.uuid4().__str__(), path=path, content="".join(cache_line), score=0.0,
-                             start_line=index - len(cache_line), end_line=index))
-        return chunks
 
-    def merge(self, chunks: list[str]) -> list[str]:
-        overlapped_chunks = []
-        for i in range(len(chunks) - 1):
-            chunk = chunks[i] + ' ' + chunks[i + 1][:self.chunk_overlap]
-            overlapped_chunks.append(chunk.strip())
-        overlapped_chunks.append(chunks[-1])
-        return overlapped_chunks
+        with open(path, 'r', encoding='utf-8') as file:
+            lines = file.readlines()
+
+        current_chunk = ""
+        current_chunk_size = 0
+        start_line = 1
+        chunk_id = 1
+
+        for i, line in enumerate(lines, 1):
+            line_length = len(line)
+
+            if current_chunk_size + line_length > self.chunk_size:
+                # Create a new chunk
+                chunks.append(Document(
+                    chunk_id=str(uuid.uuid4()),
+                    path=path,
+                    content=current_chunk.strip(),
+                    score=0.0,  # Initialize score as 0
+                    start_line=start_line,
+                    end_line=i - 1
+                ))
+
+                # Start a new chunk with overlap
+                overlap_start = max(0, current_chunk_size - self.chunk_overlap)
+                current_chunk = current_chunk[overlap_start:]
+                current_chunk_size = len(current_chunk)
+                start_line = i - len(current_chunk.split('\n')) + 1
+                chunk_id += 1
+
+            current_chunk += line
+            current_chunk_size += line_length
+
+        # Add the last chunk if there's any content left
+        if current_chunk:
+            chunks.append(Document(
+                chunk_id=str(uuid.uuid4()),
+                path=path,
+                content=current_chunk.strip(),
+                score=0.0,
+                start_line=start_line,
+                end_line=len(lines)
+            ))
+
+        return chunks
 
 
 class JavaSplitter(Splitter):
     def __init__(self, chunk_size: int = 1500, chunk_overlap: int = 50):
+        super().__init__(chunk_size, chunk_overlap)
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
 
@@ -130,9 +149,9 @@ class JavaSplitter(Splitter):
 
 def get_parse(language: str) -> Splitter:
     if language == ".java":
-        return JavaSplitter(chunk_size=300, chunk_overlap=20)
+        return JavaSplitter(chunk_size=1500, chunk_overlap=0)
     else:
-        return Splitter(chunk_size=200, chunk_overlap=100)
+        return Splitter(chunk_size=2000, chunk_overlap=100)
 
 
 def parse(file_path: str) -> list[Document]:
@@ -142,9 +161,12 @@ def parse(file_path: str) -> list[Document]:
 
 
 if __name__ == '__main__':
+    # path = os.path.expanduser(
+    #     "~/workspace/spring-ai/spring-ai-core/src/main/java/org/springframework/ai/chat/memory/InMemoryChatMemory.java")
     path = os.path.expanduser(
-        "~/workspace/spring-ai/spring-ai-core/src/main/java/org/springframework/ai/chat/memory/InMemoryChatMemory.java")
+        "~/workspace/spring-ai/README.md")
     parser = get_parse(os.path.splitext(path)[1])
     results = parser.split(path)
+    aa = []
     for chunk in results:
-        print(chunk.content)
+        print(chunk)
