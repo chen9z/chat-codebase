@@ -28,7 +28,6 @@ if __name__ == '__main__':
 
     index = get_index()
     index.encode(project_path)
-    result_ch = index.query_documents(project_name, "spring ai 项目是什么")
 
     while True:
         prompt = input("请输入问题：")
