@@ -39,7 +39,7 @@ if __name__ == '__main__':
         for doc in result:
             context += f"file:///{doc.path} \n" + doc.content
 
-        response = get_response(model="qwen2:7b-instruct-q6_K",
+        response = get_response(model="gemma2:9b-instruct-q6_K",
                                 messages=[{"role": "system", "content": system_template},
                                           {"role": "user", "content": user_template.format(context=context,
                                                                                            question=prompt)}])
