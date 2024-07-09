@@ -73,7 +73,7 @@ class JavaSplitter(Splitter):
         tree = parser.parse(bytes(content, "utf-8"))
 
         root_node = tree.root_node
-        return self._chunk_node(root_node, 0, path, content)
+        return self._chunk_node(root_node, 1, path, content)
 
     def _chunk_node(self, node, start_line, path, content):
         if not node or node.type == "ERROR":
@@ -96,18 +96,25 @@ class JavaSplitter(Splitter):
             )
 
         for child in node.children:
+            # skip the license header
+            if child and child.type == "block_comment" and child.start_byte == 0:
+                current_end_byte = child.end_byte
+                current_start_line = child.end_point[0] + 1
+                continue
             child_text = content[current_end_byte:child.end_byte]
             child_length = len(child_text)
-
             if len(current_chunk) + child_length > self.chunk_size:
                 if current_chunk:
                     chunks.append(create_document(current_chunk, current_start_line, child.start_point[0]))
                     current_chunk = child_text
-                    current_start_line = child.start_point[0]
-                elif child_length > self.chunk_size:
+                    current_start_line = child.start_point[0] + 1
+                elif child_length > self.chunk_size and child.child_count > 1:
                     chunks.extend(self._chunk_node(child, child.start_point[0], path, content))
                     current_chunk = ""
-                    current_start_line = child.end_point[0]
+                    current_start_line = child.end_point[0] + 1
+                elif child_length > self.chunk_size:
+                    chunks.append(create_document(child_text, child.start_point[0], child.end_point[0]))
+                    current_start_line = child.end_point[0] + 1
                 else:
                     current_chunk = child_text
             else:
@@ -123,7 +130,7 @@ class JavaSplitter(Splitter):
 
 def get_parse(language: str) -> Splitter:
     if language == ".java":
-        return JavaSplitter(chunk_size=200, chunk_overlap=20)
+        return JavaSplitter(chunk_size=300, chunk_overlap=20)
     else:
         return Splitter(chunk_size=200, chunk_overlap=100)
 
@@ -135,17 +142,9 @@ def parse(file_path: str) -> list[Document]:
 
 
 if __name__ == '__main__':
-    # path = "~/workspace/chat-codebase/001.txt"
-    # splitter = Splitter(chunk_size=2, chunk_overlap=1)
-    # documents = splitter.split(os.path.expanduser(path))
-    # for d in documents:
-    #     print(d)
-
     path = os.path.expanduser(
         "~/workspace/spring-ai/spring-ai-core/src/main/java/org/springframework/ai/chat/memory/InMemoryChatMemory.java")
     parser = get_parse(os.path.splitext(path)[1])
     results = parser.split(path)
     for chunk in results:
-        print("=================")
         print(chunk.content)
-        # pass
