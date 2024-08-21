@@ -6,7 +6,7 @@ import dotenv
 dotenv.load_dotenv()
 openai = OpenAI(base_url=os.getenv("OPENAI_API_BASE"), api_key=os.getenv("OPENAI_API_KEY"))
 ollama = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
-embedding_client = OpenAI(base_url="http://10.245.29.53:8080/v1", api_key="host")
+embedding_client = OpenAI(base_url="http://localhost:8080/v1", api_key="host")
 
 
 def get_response_message_with_ollama(prompt: str, model="llama3:8b-instruct-q6_K", temperature=0.1) -> str:
