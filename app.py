@@ -38,9 +38,9 @@ if __name__ == '__main__':
         for doc in documents:
             context += f"file:///{doc.path} \n" + doc.content
 
-        response = llm_model.get_response_openai_like(model="deepseek-coder",
-                                                      messages=[{"role": "system", "content": system_template},
-                                                                {"role": "user",
-                                                                 "content": user_template.format(context=context,
-                                                                                                 question=prompt)}])
+        response = llm_model.get_response(model="qwen2:7b-instruct-q6_K",
+                                          messages=[{"role": "system", "content": system_template},
+                                                    {"role": "user",
+                                                     "content": user_template.format(context=context,
+                                                                                     question=prompt)}])
         print(f"AI Assistant:{response}")

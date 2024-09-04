@@ -2,10 +2,10 @@ import os.path
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct, VectorParams, Distance
+from sentence_transformers import CrossEncoder
 
 import splitter
-from embedding_model import EmbeddingModel
-from embedding_model import OpenAILikeEmbeddingModel
+from embedding_model import EmbeddingModel, LocalEmbeddingModel
 from splitter import is_support_file, Document
 
 
@@ -15,6 +15,11 @@ class Index:
         self.model = model
         self.vector_client = vector_client
         self.embedding_dimension = self.model.get_embedding_dimension()
+        self.rerank_model = CrossEncoder(
+            "jinaai/jina-reranker-v2-base-multilingual",
+            automodel_args={"torch_dtype": "auto"},
+            trust_remote_code=True,
+        )
 
     def encode(self, project_dir: str):
         # get the absolute path
@@ -52,12 +57,19 @@ class Index:
 
     def query_documents(self, project_dir, query: str, limit=10) -> list[Document]:
         q_embeddings = self.model.get_embedding(query)
-        query_result = self.vector_client.search(project_dir, q_embeddings, limit=limit)
+        query_result = self.vector_client.search(project_dir, q_embeddings, limit=100)
+
+        rankings = self.rerank_model.rank(query, [r.payload["content"] for r in query_result], return_documents=False,
+                              convert_to_tensor=True)
+
         documents = []
-        for point in query_result:
-            doc = Document(**point.payload)
-            doc.score = point.score
+        for i, rank in enumerate(rankings):
+            if i > limit:
+                break
+            doc = Document(**query_result[rank["corpus_id"]].payload)
+            doc.score = rank["score"]
             documents.append(doc)
+
         return documents
 
 
@@ -68,7 +80,23 @@ def traverse_files(dir_path: str):
 
 
 def get_index() -> Index:
-    model = OpenAILikeEmbeddingModel()
     vector_client = QdrantClient(path="./storage")
-    index = Index(model, vector_client)
-    return index
+    return Index(LocalEmbeddingModel(), vector_client)
+
+
+if __name__ == '__main__':
+    project_path = "~/workspace/spring-ai"
+    project_name = os.path.split(project_path)[1]
+
+    model = CrossEncoder(
+        "jinaai/jina-reranker-v2-base-multilingual",
+        automodel_args={"torch_dtype": "auto"},
+        trust_remote_code=True,
+    )
+
+    index = get_index()
+    index.encode(project_path)
+    query = "如何设置 openAI 超时时间"
+    documents = index.query_documents(project_name, query, limit=20)
+    for doc in documents:
+        print(f"{doc.path}, {doc.score}")
