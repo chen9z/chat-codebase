@@ -92,19 +92,20 @@ class JavaSplitter(Splitter):
         tree = parser.parse(bytes(content, "utf-8"))
 
         root_node = tree.root_node
-        return self._chunk_node(root_node, 1, path, content)
+        return self._chunk_node(root_node, 1, path, content, "", 0)
 
-    def _chunk_node(self, node, start_line, path, content):
+    def _chunk_node(self, node, start_line, path, content, current_chunk, last_end_byte):
         if not node or node.type == "ERROR":
             logging.error(f"Failed to parse {path}")
             return []
 
         chunks = []
-        current_chunk = ""
         current_start_line = start_line
-        current_end_byte = node.start_byte
 
         def create_document(chunk, s_line, e_line):
+            # if len(chunk)>1500:
+            #     print(f"path:{path}, content length:{len(chunk)}")
+            #     print(f"{content}")
             return Document(
                 chunk_id=str(uuid.uuid4()),
                 path=path,
@@ -117,29 +118,25 @@ class JavaSplitter(Splitter):
         for child in node.children:
             # skip the license header
             if child and child.type == "block_comment" and child.start_byte == 0:
-                current_end_byte = child.end_byte
+                last_end_byte = child.end_byte
                 current_start_line = child.end_point[0] + 1
                 continue
-            child_text = content[current_end_byte:child.end_byte]
+            child_text = content[last_end_byte:child.end_byte]
             child_length = len(child_text)
             if len(current_chunk) + child_length > self.chunk_size:
-                if current_chunk:
+                if current_chunk and (child.type == "block_comment" or child.type == "method_declaration"):
                     chunks.append(create_document(current_chunk, current_start_line, child.start_point[0]))
                     current_chunk = child_text
                     current_start_line = child.start_point[0] + 1
-                elif child_length > self.chunk_size and child.child_count > 1:
-                    chunks.extend(self._chunk_node(child, child.start_point[0], path, content))
+                else:
+                    chunks.extend(
+                        self._chunk_node(child, child.start_point[0], path, content, current_chunk, last_end_byte))
                     current_chunk = ""
                     current_start_line = child.end_point[0] + 1
-                elif child_length > self.chunk_size:
-                    chunks.append(create_document(child_text, child.start_point[0], child.end_point[0]))
-                    current_start_line = child.end_point[0] + 1
-                else:
-                    current_chunk = child_text
             else:
                 current_chunk += child_text
 
-            current_end_byte = child.end_byte
+            last_end_byte = child.end_byte
 
         if current_chunk:
             chunks.append(create_document(current_chunk, current_start_line, node.end_point[0]))
@@ -161,12 +158,13 @@ def parse(file_path: str) -> list[Document]:
 
 
 if __name__ == '__main__':
-    # path = os.path.expanduser(
-    #     "~/workspace/spring-ai/spring-ai-core/src/main/java/org/springframework/ai/chat/memory/InMemoryChatMemory.java")
     path = os.path.expanduser(
-        "~/workspace/spring-ai/README.md")
+        "~/workspace/spring-ai/spring-ai-core/src/main/java/org/springframework/ai/model/function/FunctionCallbackContext.java")
+    # path = os.path.expanduser(
+    #     "~/workspace/spring-ai/README.md")
     parser = get_parse(os.path.splitext(path)[1])
     results = parser.split(path)
     aa = []
     for chunk in results:
-        print(chunk)
+        print(f"================ length:{len(chunk.content)}")
+        print(f"{chunk.content}")
