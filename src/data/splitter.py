@@ -18,7 +18,14 @@ class Document:
 
 
 def is_support_file(file_path: str) -> bool:
-    return os.path.splitext(file_path)[1] in [".java", ".xml", "yml", ".yaml", ".properties", ".md"]
+    return os.path.splitext(file_path)[1] in [
+        ".java",
+        ".xml",
+        "yml",
+        ".yaml",
+        ".properties",
+        ".md",
+    ]
 
 
 def get_content(path: str) -> str:
@@ -34,7 +41,7 @@ class Splitter:
     def split(self, path: str) -> list[Document]:
         chunks = []
 
-        with open(path, 'r', encoding='utf-8') as file:
+        with open(path, "r", encoding="utf-8") as file:
             lines = file.readlines()
 
         current_chunk = ""
@@ -47,20 +54,22 @@ class Splitter:
 
             if current_chunk_size + line_length > self.chunk_size:
                 # Create a new chunk
-                chunks.append(Document(
-                    chunk_id=str(uuid.uuid4()),
-                    path=path,
-                    content=current_chunk.strip(),
-                    score=0.0,  # Initialize score as 0
-                    start_line=start_line,
-                    end_line=i - 1
-                ))
+                chunks.append(
+                    Document(
+                        chunk_id=str(uuid.uuid4()),
+                        path=path,
+                        content=current_chunk.strip(),
+                        score=0.0,  # Initialize score as 0
+                        start_line=start_line,
+                        end_line=i - 1,
+                    )
+                )
 
                 # Start a new chunk with overlap
                 overlap_start = max(0, current_chunk_size - self.chunk_overlap)
                 current_chunk = current_chunk[overlap_start:]
                 current_chunk_size = len(current_chunk)
-                start_line = i - len(current_chunk.split('\n')) + 1
+                start_line = i - len(current_chunk.split("\n")) + 1
                 chunk_id += 1
 
             current_chunk += line
@@ -68,14 +77,16 @@ class Splitter:
 
         # Add the last chunk if there's any content left
         if current_chunk:
-            chunks.append(Document(
-                chunk_id=str(uuid.uuid4()),
-                path=path,
-                content=current_chunk.strip(),
-                score=0.0,
-                start_line=start_line,
-                end_line=len(lines)
-            ))
+            chunks.append(
+                Document(
+                    chunk_id=str(uuid.uuid4()),
+                    path=path,
+                    content=current_chunk.strip(),
+                    score=0.0,
+                    start_line=start_line,
+                    end_line=len(lines),
+                )
+            )
 
         return chunks
 
@@ -94,7 +105,9 @@ class JavaSplitter(Splitter):
         root_node = tree.root_node
         return self._chunk_node(root_node, 1, path, content, "", 0)
 
-    def _chunk_node(self, node, start_line, path, content, current_chunk, last_end_byte):
+    def _chunk_node(
+        self, node, start_line, path, content, current_chunk, last_end_byte
+    ):
         if not node or node.type == "ERROR":
             logging.error(f"Failed to parse {path}")
             return []
@@ -112,7 +125,7 @@ class JavaSplitter(Splitter):
                 content=chunk,
                 start_line=s_line,
                 end_line=e_line,
-                score=0.0
+                score=0.0,
             )
 
         for child in node.children:
@@ -121,16 +134,30 @@ class JavaSplitter(Splitter):
                 last_end_byte = child.end_byte
                 current_start_line = child.end_point[0] + 1
                 continue
-            child_text = content[last_end_byte:child.end_byte]
+            child_text = content[last_end_byte : child.end_byte]
             child_length = len(child_text)
             if len(current_chunk) + child_length > self.chunk_size:
-                if current_chunk and (child.type == "block_comment" or child.type == "method_declaration"):
-                    chunks.append(create_document(current_chunk, current_start_line, child.start_point[0]))
+                if current_chunk and (
+                    child.type == "block_comment" or child.type == "method_declaration"
+                ):
+                    chunks.append(
+                        create_document(
+                            current_chunk, current_start_line, child.start_point[0]
+                        )
+                    )
                     current_chunk = child_text
                     current_start_line = child.start_point[0] + 1
                 else:
                     chunks.extend(
-                        self._chunk_node(child, child.start_point[0], path, content, current_chunk, last_end_byte))
+                        self._chunk_node(
+                            child,
+                            child.start_point[0],
+                            path,
+                            content,
+                            current_chunk,
+                            last_end_byte,
+                        )
+                    )
                     current_chunk = ""
                     current_start_line = child.end_point[0] + 1
             else:
@@ -139,7 +166,9 @@ class JavaSplitter(Splitter):
             last_end_byte = child.end_byte
 
         if current_chunk:
-            chunks.append(create_document(current_chunk, current_start_line, node.end_point[0]))
+            chunks.append(
+                create_document(current_chunk, current_start_line, node.end_point[0])
+            )
 
         return chunks
 
@@ -157,14 +186,6 @@ def parse(file_path: str) -> list[Document]:
     return splitter.split(file_path)
 
 
-if __name__ == '__main__':
-    path = os.path.expanduser(
-        "~/workspace/spring-ai/spring-ai-core/src/main/java/org/springframework/ai/model/function/FunctionCallbackContext.java")
-    # path = os.path.expanduser(
-    #     "~/workspace/spring-ai/README.md")
-    parser = get_parse(os.path.splitext(path)[1])
-    results = parser.split(path)
-    aa = []
-    for chunk in results:
-        print(f"================ length:{len(chunk.content)}")
-        print(f"{chunk.content}")
+if __name__ == "__main__":
+    # 这个部分可以移除，因为我们现在使用 FastAPI 处理请求
+    pass

@@ -1,31 +1,36 @@
+from abc import ABC, abstractmethod
 from typing import List
 
 from openai import OpenAI
 from sentence_transformers import SentenceTransformer
 
 
-class EmbeddingModel:
-    def __init__(self):
-        super().__init__()
+class EmbeddingModel(ABC):
+    """Abstract base class for embedding models."""
 
-    def get_embedding_dimension(self):
-        pass
-
+    @abstractmethod
     def get_embedding(self, text: str) -> List[float]:
+        """Get embedding for a text."""
+        pass
+
+    @abstractmethod
+    def get_embedding_dimension(self) -> int:
+        """Get the dimension of the embedding vector."""
         pass
 
 
-class LocalEmbeddingModel(EmbeddingModel):
+class JinaCodeEmbeddingModel(EmbeddingModel):
+    """Local embedding model implementation using sentence-transformers."""
+
     def __init__(self):
-        super().__init__()
         self.model = SentenceTransformer(model_name_or_path="jinaai/jina-embeddings-v2-base-code",
                                          trust_remote_code=True)
 
-    def get_embedding_dimension(self):
-        return self.model.get_sentence_embedding_dimension()
-
     def get_embedding(self, text: str) -> List[float]:
         return self.model.encode(text, show_progress_bar=True).tolist()
+
+    def get_embedding_dimension(self) -> int:
+        return self.model.get_sentence_embedding_dimension()
 
 
 class OpenAILikeEmbeddingModel(EmbeddingModel):
@@ -40,14 +45,4 @@ class OpenAILikeEmbeddingModel(EmbeddingModel):
 
     def get_embedding(self, text: str) -> List[float]:
         response = self.client.embeddings.create(model="", input=[text])
-        return response.data[0].embedding
-
-
-if __name__ == '__main__':
-    open_like_model = OpenAILikeEmbeddingModel()
-    print(open_like_model.get_embedding_dimension())
-    print(open_like_model.get_embedding("hello world"))
-
-    local_model = LocalEmbeddingModel()
-    print(local_model.get_embedding_dimension())
-    print(local_model.get_embedding("hello world"))
+        return response.data[-1].embedding
