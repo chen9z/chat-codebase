@@ -25,7 +25,7 @@ class RerankAPIModel(RerankModel):
     def rerank(self, query: str, documents: List[Document], limit: int = 10) -> List[Document]:
         headers = {"Content-Type": "application/json"}
         try:
-            response = requests.post("http://10.245.29.174:8080/v1/rerank",
+            response = requests.post("http://127.0.0.1:8080/v1/rerank",
                                      json={
                                          "query": query,
                                          "documents": [doc.content for doc in documents],

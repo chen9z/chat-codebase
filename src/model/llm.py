@@ -27,11 +27,9 @@ class LLMClient:
                 return response.choices[0].message.content
 
             # 流式响应处理
-            content = []
             for chunk in response:
                 if chunk.choices[0].delta.content is not None:
-                    content.append(chunk.choices[0].delta.content)
-            return "".join(content)
+                    yield chunk.choices[0].delta.content
 
         except Exception as e:
             print(f"Error in LLMClient: {str(e)}")
@@ -41,7 +39,18 @@ class LLMClient:
 if __name__ == "__main__":
     # 测试本地模型
     local_client = LLMClient(base_url=os.getenv("OPENAI_API_BASE"), api_key=os.getenv("OPENAI_API_KEY"))
-    print(
-        "Local model response:",
-        local_client.get_response(model="deepseek-chat", messages=[{"role": "user", "content": "你是谁？"}]),
-    )
+    # print(
+    #     "Local model response:",
+    #     local_client.get_response(model="deepseek-chat", messages=[{"role": "user", "content": "你是谁？"}]),
+    # )
+
+    # 测试流式响应
+    print("\n=== Testing streaming response ===")
+    print("Streaming response:", end=" ", flush=True)
+    for chunk in local_client.get_response(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": "用简短的话介绍下你自己"}],
+            stream=True
+    ):
+        print(chunk, end="", flush=True)
+    print()  # 打印换行

@@ -37,7 +37,7 @@ class OpenAILikeEmbeddingModel(EmbeddingModel):
 
     def __init__(self):
         super().__init__()
-        self.client = OpenAI(base_url="http://10.245.29.174:8080/v1", api_key="host")
+        self.client = OpenAI(base_url="http://127.0.0.1:8080/v1", api_key="host")
         self.embedding_dimension = 768
 
     def get_embedding_dimension(self):
