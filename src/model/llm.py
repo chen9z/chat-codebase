@@ -1,5 +1,3 @@
-import os
-
 import dotenv
 from openai import OpenAI
 
@@ -27,30 +25,51 @@ class LLMClient:
                 return response.choices[0].message.content
 
             # 流式响应处理
+            content = []
             for chunk in response:
                 if chunk.choices[0].delta.content is not None:
-                    yield chunk.choices[0].delta.content
+                    content.append(chunk.choices[0].delta.content)
+            return "".join(content)
 
         except Exception as e:
             print(f"Error in LLMClient: {str(e)}")
             return None
 
+    def get_response_with_tools(self, messages, tools, model=None, temperature=0.1):
+        try:
+            model = model or self.default_model
+            response = self.client.chat.completions.create(
+                model=model,
+                temperature=temperature,
+                messages=messages,
+                tools=tools,
+                tool_choice="auto"
+            )
+            
+            message = response.choices[0].message
+            
+            # 如果返回tool_calls,需要执行工具调用
+            if message.tool_calls:
+                return {
+                    "type": "tool_calls",
+                    "tool_calls": message.tool_calls
+                }
+            
+            # 否则返回普通文本响应
+            return {
+                "type": "message",
+                "content": message.content
+            }
+
+        except Exception as e:
+            print(f"Error in LLMClient tool call: {str(e)}")
+            return None
+
 
 if __name__ == "__main__":
     # 测试本地模型
-    local_client = LLMClient(base_url=os.getenv("OPENAI_API_BASE"), api_key=os.getenv("OPENAI_API_KEY"))
-    # print(
-    #     "Local model response:",
-    #     local_client.get_response(model="deepseek-chat", messages=[{"role": "user", "content": "你是谁？"}]),
-    # )
-
-    # 测试流式响应
-    print("\n=== Testing streaming response ===")
-    print("Streaming response:", end=" ", flush=True)
-    for chunk in local_client.get_response(
-            model="deepseek-chat",
-            messages=[{"role": "user", "content": "用简短的话介绍下你自己"}],
-            stream=True
-    ):
-        print(chunk, end="", flush=True)
-    print()  # 打印换行
+    local_client = LLMClient()
+    print(
+        "Local model response:",
+        local_client.get_response([{"role": "user", "content": "你是谁？"}]),
+    )
