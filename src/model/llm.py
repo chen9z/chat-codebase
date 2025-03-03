@@ -1,3 +1,5 @@
+import os
+
 import dotenv
 from openai import OpenAI
 
@@ -11,12 +13,6 @@ class LLMClient:
             api_key="ollama",
             default_model="qwen2.5:7b-instruct-q6_K",
     ):
-        """
-        初始化 LLM 客户端
-        :param base_url: API 基础URL
-        :param api_key: API密钥
-        :param default_model: 默认使用的模型
-        """
         self.client = OpenAI(base_url=base_url, api_key=api_key)
         self.default_model = default_model
 
@@ -44,8 +40,8 @@ class LLMClient:
 
 if __name__ == "__main__":
     # 测试本地模型
-    local_client = LLMClient()
+    local_client = LLMClient(base_url=os.getenv("OPENAI_API_BASE"), api_key=os.getenv("OPENAI_API_KEY"))
     print(
         "Local model response:",
-        local_client.get_response([{"role": "user", "content": "你是谁？"}]),
+        local_client.get_response(model="deepseek-chat", messages=[{"role": "user", "content": "你是谁？"}]),
     )

@@ -1,12 +1,13 @@
+import os
 from pathlib import Path
 from typing import Generator, Optional, List
 
 from qdrant_client import QdrantClient
 
 import config.settings
-from src.model.embedding import JinaCodeEmbeddingModel
+from src.model.embedding import JinaCodeEmbeddingModel, OpenAILikeEmbeddingModel
 from src.model.llm import LLMClient
-from src.model.reranker import RerankModel, LocalRerankModel
+from src.model.reranker import RerankModel, LocalRerankModel, RerankAPIModel
 from src.data.repository import Repository
 from src.data.splitter import Document
 
@@ -16,6 +17,8 @@ class Application:
 
     def __init__(
             self,
+            llm_client: Optional[LLMClient] = None,
+            model: str = "deepseek-chat",
             embedding_model=None,
             rerank_model: Optional[RerankModel] = None,
             vector_store_path: str = "./storage"
@@ -27,6 +30,8 @@ class Application:
             rerank_model: Optional custom rerank model
             vector_store_path: Path to vector store
         """
+        self.llm_client = llm_client or LLMClient()
+        self.model = model
         self.embedding_model = embedding_model or JinaCodeEmbeddingModel()
         self.rerank_model = rerank_model or LocalRerankModel()
         self.vector_client = QdrantClient(path=vector_store_path)
@@ -35,7 +40,6 @@ class Application:
             self.vector_client,
             rerank_model=rerank_model or LocalRerankModel()
         )
-        self.llm_client = LLMClient()
 
     def index_project(self, project_path: str) -> None:
         """Index a project directory.
@@ -48,31 +52,13 @@ class Application:
         print(f"Successfully indexed project: {project_path.name}")
 
     def format_context(self, documents: List[Document]) -> str:
-        """Format search results into context for LLM input.
-        
-        This method formats the search results in a way that's optimal for LLM understanding,
-        including source information, relevance scores, and clear document separation.
-        
-        Args:
-            documents: List of Document objects from search results
-            
-        Returns:
-            Formatted context string ready for LLM consumption
-        """
         if not documents:
             return ""
 
-        context_parts = []
+        format_context = ""
         for doc in documents:
-            # Format each document with its metadata and content
-            context_parts.append(
-                f"Source: {doc.path}\n"
-                f"Relevance Score: {doc.score:.2f}\n"
-                f"Content:\n{doc.content}\n"
-            )
-
-        # Join all parts with clear separation
-        return "\n---\n".join(context_parts)
+            format_context += f"file:///{doc.path} \n" + doc.content
+        return format_context
 
     def query(self, project_name: str, query: str) -> Generator:
         """Query the project and get responses.
@@ -97,11 +83,24 @@ class Application:
             },
             {
                 "role": "user",
-                "content": config.settings.USER_PROMPT_TEMPLATE.format(context, query)
+                "content": config.settings.USER_PROMPT_TEMPLATE.format(context=context, query=query)
             }
         ]
 
         print("Messages:", messages)
 
         # Get streaming response
-        return self.llm_client.get_response(messages)
+        return self.llm_client.get_response(model=self.model, messages=messages, stream=True)
+
+
+if __name__ == '__main__':
+    app = Application(llm_client=LLMClient(base_url=os.getenv("OPENAI_API_BASE"), api_key=os.getenv("OPENAI_API_KEY")),
+                      model="deepseek-chat",
+                      embedding_model=OpenAILikeEmbeddingModel(),
+                      rerank_model=RerankAPIModel())
+
+    project_path = os.path.expanduser("~/workspace/spring-ai")
+    project_name = project_path.split("/")[-1]
+    app.index_project(project_path)
+    response = app.query(project_name, "spring ai 是什么？")
+    print("Response:", response)

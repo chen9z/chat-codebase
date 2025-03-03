@@ -1,10 +1,20 @@
 import os.path
 
+import dotenv
+
 from src.application import Application
+from src.model.embedding import OpenAILikeEmbeddingModel
+from src.model.llm import LLMClient
+from src.model.reranker import RerankAPIModel
+
+dotenv.load_dotenv()
 
 
 def main():
-    app = Application()
+    app = Application(llm_client=LLMClient(base_url=os.getenv("OPENAI_API_BASE"), api_key=os.getenv("OPENAI_API_KEY")),
+                      model="deepseek-chat",
+                      embedding_model=OpenAILikeEmbeddingModel(),
+                      rerank_model=RerankAPIModel())
 
     project_path = os.path.expanduser("~/workspace/spring-ai")
     project_name = project_path.split("/")[-1]

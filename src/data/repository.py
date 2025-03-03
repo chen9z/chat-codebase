@@ -74,7 +74,7 @@ class Repository:
         search_results = self.vector_client.search(
             project_name,
             q_embeddings,
-            limit=min(100, limit * 4)  # Fetch more candidates for reranking
+            limit=limit * 2
         )
 
         if not search_results:
@@ -82,7 +82,6 @@ class Repository:
 
         documents = [Document(**result.payload) for result in search_results]
         reranked_docs = self.rerank_model.rerank(query, documents, limit=limit)
-
         return reranked_docs
 
 

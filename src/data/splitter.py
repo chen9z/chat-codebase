@@ -9,12 +9,12 @@ from tree_sitter import Language, Parser
 
 @dataclass
 class Document:
-    chunk_id: str
-    path: str
-    content: str
-    score: float
-    start_line: int
-    end_line: int
+    chunk_id: str = ""
+    path: str = ""
+    content: str = ""
+    score: float = 0.0
+    start_line: int = 0
+    end_line: int = 0
 
 
 def is_support_file(file_path: str) -> bool:
@@ -106,7 +106,7 @@ class JavaSplitter(Splitter):
         return self._chunk_node(root_node, 1, path, content, "", 0)
 
     def _chunk_node(
-        self, node, start_line, path, content, current_chunk, last_end_byte
+            self, node, start_line, path, content, current_chunk, last_end_byte
     ):
         if not node or node.type == "ERROR":
             logging.error(f"Failed to parse {path}")
@@ -134,11 +134,11 @@ class JavaSplitter(Splitter):
                 last_end_byte = child.end_byte
                 current_start_line = child.end_point[0] + 1
                 continue
-            child_text = content[last_end_byte : child.end_byte]
+            child_text = content[last_end_byte: child.end_byte]
             child_length = len(child_text)
             if len(current_chunk) + child_length > self.chunk_size:
                 if current_chunk and (
-                    child.type == "block_comment" or child.type == "method_declaration"
+                        child.type == "block_comment" or child.type == "method_declaration"
                 ):
                     chunks.append(
                         create_document(

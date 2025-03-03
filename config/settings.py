@@ -54,7 +54,7 @@ Here are the set of contexts:
 Remember, don't blindly repeat the contexts verbatim.
 ###
 And here is the user question:
-{question}
+{query}
 
 ###
 Answer:

@@ -1,17 +1,17 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict
+from typing import List
 
 import requests
 from transformers import AutoModelForSequenceClassification
 
-from config.settings import RERANK_MODEL
+from src.data.splitter import Document
 
 
 class RerankModel(ABC):
     """Abstract base class for rerank models."""
 
     @abstractmethod
-    def rerank(self, query: str, documents: List[Dict], limit: int = 10) -> List[Dict]:
+    def rerank(self, query: str, documents: List[Document], limit: int = 10) -> List[Document]:
         """Rerank documents based on their relevance to the query."""
         pass
 
@@ -20,30 +20,30 @@ class RerankAPIModel(RerankModel):
     """Jina AI rerank model implementation."""
 
     def __init__(self):
-        config = RERANK_MODEL["jina"]
-        self.api_key = config["api_key"]
-        self.api_url = config["api_url"]
+        pass
 
-    def rerank(self, query: str, documents: List[Dict], limit: int = 10) -> List[Dict]:
-        headers = {"Authorization": f"Bearer {self.api_key}"}
-        data = {
-            "query": query,
-            "documents": [doc["content"] for doc in documents],
-            "limit": limit
-        }
+    def rerank(self, query: str, documents: List[Document], limit: int = 10) -> List[Document]:
+        headers = {"Content-Type": "application/json"}
+        try:
+            response = requests.post("http://10.245.29.174:8080/v1/rerank",
+                                     json={
+                                         "query": query,
+                                         "documents": [doc.content for doc in documents],
+                                         "top_n": limit
+                                     },
+                                     headers=headers)
+            response.raise_for_status()
+            rankings = response.json()
+            reranked_docs = []
+            for rank in rankings:
+                doc = documents[rank["index"]]
+                doc.score = rank["score"]
+                reranked_docs.append(doc)
 
-        response = requests.post(self.api_url, headers=headers, json=data)
-        response.raise_for_status()
-
-        results = response.json()["results"]
-        reranked_docs = []
-        for result in results:
-            doc_idx = result["index"]
-            reranked_docs.append({
-                **documents[doc_idx],
-                "score": result["score"]
-            })
-        return reranked_docs
+            return reranked_docs
+        except Exception as e:
+            print(e)
+            raise e
 
 
 class LocalRerankModel(RerankModel):
@@ -56,19 +56,19 @@ class LocalRerankModel(RerankModel):
             trust_remote_code=True,
         )
 
-    def rerank(self, query: str, documents: List[dict], limit: int = 10) -> List[Dict]:
+    def rerank(self, query: str, documents: List[Document], limit: int = 10) -> List[Document]:
         sentence_pairs = [[query, doc] for doc in documents]
-        reranked_docs = self.model.rerank(sentence_pairs, max_length=1024)
+        reranked_docs = self.model.rerank(sentence_pairs, max_length=8096)
         return reranked_docs
 
 
 if __name__ == '__main__':
     query = "如何在Python中创建一个列表"
     documents = [
-        {"content": "Python列表是一个有序的集合，可以容纳任意数量的对象。"}
+        Document(content="创建一个列表的Python代码示例"),
     ]
 
-    reranker = LocalRerankModel()
+    reranker = RerankAPIModel()
     reranked_docs = reranker.rerank(query, documents, 10)
     for doc in reranked_docs:
         print(doc)
