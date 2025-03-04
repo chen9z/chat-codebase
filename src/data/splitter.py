@@ -8,6 +8,12 @@ from tree_sitter import Language, Parser
 
 
 @dataclass
+class Span:
+    start: int
+    end: int
+
+
+@dataclass
 class Document:
     chunk_id: str = ""
     path: str = ""
