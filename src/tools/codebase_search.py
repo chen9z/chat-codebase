@@ -12,23 +12,21 @@ from src.model.reranker import RerankModel, RerankAPIModel
 class CodebaseSearchTool(BaseTool):
     """Tool for performing semantic search over codebase using Repository."""
 
+    @property
+    def name(self) -> str:
+        return "codebase_search"
+
     def __init__(
             self,
             embedding_model: EmbeddingModel,
             vector_client: QdrantClient,
-            rerank_model: Optional[RerankModel] = None,
-            persist_dir: str = "./storage"
+            rerank_model: RerankModel
     ):
         self.repository = Repository(
             model=embedding_model,
             vector_client=vector_client,
             rerank_model=rerank_model,
-            persist_dir=persist_dir
         )
-
-    @property
-    def name(self) -> str:
-        return "codebase_search"
 
     @property
     def description(self) -> str:

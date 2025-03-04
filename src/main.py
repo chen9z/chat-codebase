@@ -1,7 +1,14 @@
 import asyncio
 import json
-from pathlib import Path
-from typing import Dict, List
+import os
+from typing import Dict
+
+import dotenv
+from qdrant_client import QdrantClient
+
+from src.model.embedding import OpenAILikeEmbeddingModel
+from src.model.llm import LLMClient
+from src.model.reranker import RerankAPIModel
 from src.tools import (
     CodebaseSearchTool,
     GrepSearchTool,
@@ -11,15 +18,19 @@ from src.tools import (
     FindByNameTool,
     RelatedFilesTool,
 )
-from src.model.llm import LLMClient
+
+dotenv.load_dotenv()
+
 
 class ToolManager:
     """管理工具集合和LLM交互的类"""
-    
+
     def __init__(self):
         # 初始化所有工具
         self.tools = {
-            "codebase_search": CodebaseSearchTool(),
+            "codebase_search": CodebaseSearchTool(embedding_model=OpenAILikeEmbeddingModel(),
+                                                  vector_client=QdrantClient(path="../storage"),
+                                                  rerank_model=RerankAPIModel()),
             "grep_search": GrepSearchTool(),
             "list_dir": ListDirTool(),
             "view_file": ViewFileTool(),
@@ -27,13 +38,13 @@ class ToolManager:
             "find_by_name": FindByNameTool(),
             "related_files": RelatedFilesTool(),
         }
-        
+
         # 初始化LLM客户端
-        self.llm = LLMClient()
-        
+        self.llm = LLMClient(base_url=os.getenv("OPENAI_API_BASE"), api_key=os.getenv("OPENAI_API_KEY"))
+
         # 转换工具为OpenAI格式
         self.openai_tools = self._convert_tools_to_openai_format()
-    
+
     def _convert_tools_to_openai_format(self):
         """将工具转换为OpenAI tools格式"""
         openai_tools = []
@@ -83,7 +94,7 @@ class ToolManager:
         """执行指定的工具"""
         if tool_name not in self.tools:
             return {"error": f"Tool {tool_name} not found"}
-        
+
         tool = self.tools[tool_name]
         try:
             result = await tool.execute(**params)
@@ -106,19 +117,20 @@ class ToolManager:
 
         while True:
             response = self.llm.get_response_with_tools(
+                model="deepseek-coder",
                 messages=messages,
                 tools=self.openai_tools
             )
-            
+
             if not response:
                 return "LLM call failed"
-                
+
             if response["type"] == "message":
                 return response["content"]
-                
+
             # Handle tool calls
             tool_results = asyncio.run(self._handle_tool_calls(response["tool_calls"]))
-            
+
             # Add tool execution results to message history
             messages.append({
                 "role": "assistant",
@@ -130,18 +142,20 @@ class ToolManager:
                 "content": tool_results[0]["output"]
             })
 
+
 async def main():
     # 创建工具管理器
     tool_manager = ToolManager()
-    
+
     # 设置项目路径和查询
     project_path = "/home/looper/workspace/chat-codebase"
-    query = "What tools are available in this project?"
-    
+    query = "这个项目有哪些 tools"
+
     # 执行查询并打印结果
     result = tool_manager.query_with_tools(project_path, query)
     print("\nQuery result:")
     print(result)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
