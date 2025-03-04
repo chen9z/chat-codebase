@@ -1,3 +1,5 @@
+import os
+
 import dotenv
 from openai import OpenAI
 
@@ -23,17 +25,16 @@ class LLMClient:
 
             if not stream:
                 return response.choices[0].message.content
-
-            # 流式响应处理
-            content = []
-            for chunk in response:
-                if chunk.choices[0].delta.content is not None:
-                    content.append(chunk.choices[0].delta.content)
-            return "".join(content)
-
+            else:
+                return self._stream_response(response)
         except Exception as e:
             print(f"Error in LLMClient: {str(e)}")
             return None
+        
+    def _stream_response(self,response):
+        for chunk in response:
+            if chunk.choices[0].delta.content is not None:
+                yield chunk.choices[0].delta.content
 
     def get_response_with_tools(self, messages, tools, model=None, temperature=0.1):
         try:
@@ -45,16 +46,16 @@ class LLMClient:
                 tools=tools,
                 tool_choice="auto"
             )
-            
+
             message = response.choices[0].message
-            
+
             # 如果返回tool_calls,需要执行工具调用
             if message.tool_calls:
                 return {
                     "type": "tool_calls",
                     "tool_calls": message.tool_calls
                 }
-            
+
             # 否则返回普通文本响应
             return {
                 "type": "message",
@@ -67,9 +68,20 @@ class LLMClient:
 
 
 if __name__ == "__main__":
-    # 测试本地模型
-    local_client = LLMClient()
+    local_client = LLMClient(base_url=os.getenv("OPENAI_API_BASE"), api_key=os.getenv("OPENAI_API_KEY"))
+
+    # 测试普通响应
+    print("\n=== Testing normal response ===")
     print(
-        "Local model response:",
-        local_client.get_response([{"role": "user", "content": "你是谁？"}]),
+        local_client.get_response(model="deepseek-chat", messages=[{"role": "user", "content": "你是谁？"}],
+                                  stream=False)
     )
+
+    # 测试流式响应
+    print("\n=== Testing streaming response ===")
+    stream = local_client.get_response(model="deepseek-chat", messages=[{"role": "user", "content": "你是谁？"}],
+                                       stream=True)
+    if stream:
+        for chunk in stream:
+            print(chunk, end='', flush=True)
+    print("\n")
