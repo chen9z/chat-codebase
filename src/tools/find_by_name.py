@@ -1,10 +1,9 @@
-from typing import Any, Dict, List, Optional
+import json
 import os
-from pathlib import Path
 from datetime import datetime
 from fnmatch import fnmatch
-import asyncio
-import json
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from src.tools.base import BaseTool  # Try relative import first
 
@@ -25,6 +24,7 @@ class FindByNameTool(BaseTool):
     @property
     def parameters(self) -> Dict[str, Any]:
         return {
+            "type": "object",
             "properties": {
                 "search_directory": {
                     "type": "string",
@@ -158,13 +158,13 @@ class FindByNameTool(BaseTool):
             }
 
 
-async def main():
+def main():
     """Test the FindByNameTool with various scenarios."""
     tool = FindByNameTool()
 
     # Test case 1: Find all Python files
     print("\n1. Finding all Python files in current directory:")
-    result = await tool.execute(
+    result = tool.execute(
         search_directory=os.path.dirname(os.path.dirname(os.path.dirname(__file__))),  # Go to project root
         pattern="*.py",
         type="file"
@@ -173,7 +173,7 @@ async def main():
 
     # Test case 2: Find files with depth limit
     print("\n2. Finding files with depth limit:")
-    result = await tool.execute(
+    result = tool.execute(
         search_directory=".",
         pattern="*.*",
         max_depth=1,
@@ -183,4 +183,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

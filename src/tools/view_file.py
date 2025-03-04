@@ -3,6 +3,7 @@ from pathlib import Path
 
 from .base import BaseTool
 
+
 class ViewFileTool(BaseTool):
     """Tool for viewing file contents with line range support."""
 
@@ -19,6 +20,7 @@ class ViewFileTool(BaseTool):
     @property
     def parameters(self) -> Dict[str, Any]:
         return {
+            "type": "object",
             "properties": {
                 "file_path": {
                     "type": "string",
@@ -36,19 +38,19 @@ class ViewFileTool(BaseTool):
             "required": ["file_path", "start_line", "end_line"]
         }
 
-    async def execute(
-        self,
-        file_path: str,
-        start_line: int,
-        end_line: int
+    def execute(
+            self,
+            file_path: str,
+            start_line: int,
+            end_line: int
     ) -> Dict[str, Any]:
         """View file contents within specified line range.
-        
+
         Args:
             file_path: Path to the file to view
             start_line: Start line number (0-indexed)
             end_line: End line number (0-indexed)
-            
+
         Returns:
             Dict containing file contents and metadata
         """
@@ -71,24 +73,24 @@ class ViewFileTool(BaseTool):
                 # Validate line range
                 start_line = max(0, min(start_line, total_lines - 1))
                 end_line = max(0, min(end_line, total_lines - 1))
-                
+
                 if start_line > end_line:
                     start_line, end_line = end_line, start_line
 
                 # Get the requested lines
                 requested_lines = all_lines[start_line:end_line + 1]
-                
+
                 # Create summary of lines before and after
                 before_summary = None
                 after_summary = None
-                
+
                 if start_line > 0:
                     before_lines = min(5, start_line)  # Show up to 5 lines before
                     before_summary = {
                         "lines_not_shown": start_line - before_lines,
                         "preview": all_lines[start_line - before_lines:start_line]
                     }
-                
+
                 if end_line < total_lines - 1:
                     after_lines = min(5, total_lines - end_line - 1)  # Show up to 5 lines after
                     after_summary = {
@@ -115,4 +117,4 @@ class ViewFileTool(BaseTool):
             return {
                 "error": f"Error reading file {file_path}: {str(e)}",
                 "contents": None
-            } 
+            }

@@ -21,6 +21,7 @@ class RelatedFilesTool(BaseTool):
     @property
     def parameters(self) -> Dict[str, Any]:
         return {
+            "type": "object",
             "properties": {
                 "file_path": {
                     "type": "string",
@@ -30,7 +31,7 @@ class RelatedFilesTool(BaseTool):
             "required": ["file_path"]
         }
 
-    async def execute(self, file_path: str) -> Dict[str, Any]:
+    def execute(self, file_path: str) -> Dict[str, Any]:
         """Find related files for the given input file.
         
         Args:
@@ -114,17 +115,17 @@ class RelatedFilesTool(BaseTool):
             }
 
 
-async def main():
+def main():
     """Test the RelatedFilesTool with various scenarios."""
     tool = RelatedFilesTool()
 
     # Test case 1: Find related files for a Python file
     print("\n1. Finding related files for a Python file:")
-    result = await tool.execute(
+    result = tool.execute(
         file_path="base.py"
     )
     print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    pass

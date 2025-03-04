@@ -3,10 +3,10 @@ from typing import Any, Dict, Optional
 
 from qdrant_client import QdrantClient
 
-from src.tools.base import BaseTool
 from src.data.repository import Repository
-from src.model.embedding import EmbeddingModel, OpenAILikeEmbeddingModel
-from src.model.reranker import RerankModel, RerankAPIModel
+from src.model.embedding import OpenAILikeEmbeddingModel
+from src.model.reranker import RerankAPIModel
+from src.tools.base import BaseTool
 
 
 class CodebaseSearchTool(BaseTool):
@@ -18,14 +18,12 @@ class CodebaseSearchTool(BaseTool):
 
     def __init__(
             self,
-            embedding_model: EmbeddingModel,
-            vector_client: QdrantClient,
-            rerank_model: RerankModel
+            repository: Optional[Repository] = None,
     ):
         self.repository = Repository(
-            model=embedding_model,
-            vector_client=vector_client,
-            rerank_model=rerank_model,
+            model=repository.model,
+            vector_client=repository.vector_client,
+            rerank_model=repository.rerank_model,
         )
 
     @property
@@ -37,6 +35,7 @@ class CodebaseSearchTool(BaseTool):
     @property
     def parameters(self) -> Dict[str, Any]:
         return {
+            "type": "object",
             "properties": {
                 "project_name": {
                     "type": "string",
@@ -97,6 +96,7 @@ class CodebaseSearchTool(BaseTool):
             }
 
         except Exception as e:
+            print(e)
             return {
                 "error": f"Search failed: {str(e)}",
                 "matches": []
@@ -114,11 +114,15 @@ class CodebaseSearchTool(BaseTool):
             raise Exception(f"Failed to index project: {str(e)}")
 
 
-if __name__ == '__main__':
+async def main():
     project_dir = os.path.expanduser("~/workspace/spring-ai")
     qdrant_client = QdrantClient(path="./storage")
     tool = CodebaseSearchTool(embedding_model=OpenAILikeEmbeddingModel(), rerank_model=RerankAPIModel(),
                               vector_client=qdrant_client)
     tool.index_project(project_dir)
-    result = tool.execute(project_dir.split("/")[-1], 'query', 5)
+    result = tool.execute(project_dir.split("/")[-1], 'spring ai 是什么？', 5)
     print(result)
+
+
+if __name__ == '__main__':
+    main()

@@ -4,6 +4,7 @@ from pathlib import Path
 
 from .base import BaseTool
 
+
 class GrepSearchTool(BaseTool):
     """Tool for performing fast text-based search using ripgrep."""
 
@@ -19,6 +20,7 @@ class GrepSearchTool(BaseTool):
     @property
     def parameters(self) -> Dict[str, Any]:
         return {
+            "type": "object",
             "properties": {
                 "search_directory": {
                     "type": "string",
@@ -47,13 +49,13 @@ class GrepSearchTool(BaseTool):
             "required": ["query"]
         }
 
-    async def execute(
-        self,
-        query: str,
-        search_directory: str = ".",
-        match_per_line: bool = True,
-        includes: Optional[List[str]] = None,
-        case_insensitive: bool = False
+    def execute(
+            self,
+            query: str,
+            search_directory: str = ".",
+            match_per_line: bool = True,
+            includes: Optional[List[str]] = None,
+            case_insensitive: bool = False
     ) -> Dict[str, Any]:
         """Execute grep search using ripgrep.
         
@@ -68,24 +70,24 @@ class GrepSearchTool(BaseTool):
             Dict containing search results
         """
         cmd = ["rg"]
-        
+
         # Add options
         if case_insensitive:
             cmd.append("-i")
-        
+
         if match_per_line:
             cmd.extend(["-n", "--color", "never"])
         else:
             cmd.append("-l")
-        
+
         # Add file type includes
         if includes:
             for include in includes:
                 cmd.extend(["-g", include])
-        
+
         # Add search pattern and directory
         cmd.extend([query, search_directory])
-        
+
         try:
             result = subprocess.run(
                 cmd,
@@ -93,7 +95,7 @@ class GrepSearchTool(BaseTool):
                 text=True,
                 check=False  # Don't raise on non-zero exit (no matches)
             )
-            
+
             matches = []
             if result.stdout:
                 lines = result.stdout.strip().split("\n")
@@ -109,12 +111,12 @@ class GrepSearchTool(BaseTool):
                             })
                     else:
                         matches.append({"file": line})
-            
+
             return {
                 "matches": matches,
                 "truncated": len(matches) >= 50
             }
-            
+
         except subprocess.CalledProcessError as e:
             return {
                 "error": f"Search failed: {str(e)}",
@@ -124,4 +126,4 @@ class GrepSearchTool(BaseTool):
             return {
                 "error": f"Unexpected error: {str(e)}",
                 "matches": []
-            } 
+            }

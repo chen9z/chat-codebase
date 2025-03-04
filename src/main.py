@@ -6,6 +6,7 @@ from typing import Dict
 import dotenv
 from qdrant_client import QdrantClient
 
+from src.data.repository import Repository
 from src.model.embedding import OpenAILikeEmbeddingModel
 from src.model.llm import LLMClient
 from src.model.reranker import RerankAPIModel
@@ -26,11 +27,12 @@ class ToolManager:
     """管理工具集合和LLM交互的类"""
 
     def __init__(self):
+        repository = Repository(model=OpenAILikeEmbeddingModel(), vector_client=QdrantClient(path="../storage"),
+                                rerank_model=RerankAPIModel())
+        self.repository = repository
         # 初始化所有工具
         self.tools = {
-            "codebase_search": CodebaseSearchTool(embedding_model=OpenAILikeEmbeddingModel(),
-                                                  vector_client=QdrantClient(path="../storage"),
-                                                  rerank_model=RerankAPIModel()),
+            "codebase_search": CodebaseSearchTool(repository),
             "grep_search": GrepSearchTool(),
             "list_dir": ListDirTool(),
             "view_file": ViewFileTool(),
@@ -54,23 +56,19 @@ class ToolManager:
                 "function": {
                     "name": name,
                     "description": tool.description,
-                    "parameters": {
-                        "type": "object",
-                        "properties": tool.parameters,
-                        "required": list(tool.parameters.keys())
-                    }
+                    "parameters": tool.parameters
                 }
             })
         return openai_tools
 
-    async def _handle_tool_calls(self, tool_calls):
+    def _handle_tool_calls(self, tool_calls):
         """处理工具调用返回结果"""
         results = []
         for tool_call in tool_calls:
             tool_name = tool_call.function.name
             try:
                 parameters = json.loads(tool_call.function.arguments)
-                result = await self.execute_tool(tool_name, **parameters)
+                result = self.execute_tool(tool_name, **parameters)
                 results.append({
                     "tool_call_id": tool_call.id,
                     "output": json.dumps(result, ensure_ascii=False)
@@ -90,14 +88,14 @@ class ToolManager:
             descriptions.append(desc)
         return "\n".join(descriptions)
 
-    async def execute_tool(self, tool_name: str, **params) -> Dict:
+    def execute_tool(self, tool_name: str, **params) -> Dict:
         """执行指定的工具"""
         if tool_name not in self.tools:
             return {"error": f"Tool {tool_name} not found"}
 
         tool = self.tools[tool_name]
         try:
-            result = await tool.execute(**params)
+            result = tool.execute(**params)
             return result
         except Exception as e:
             return {"error": f"Tool execution failed: {str(e)}"}
@@ -117,7 +115,7 @@ class ToolManager:
 
         while True:
             response = self.llm.get_response_with_tools(
-                model="deepseek-coder",
+                model="gpt-4o-2024-11-20",
                 messages=messages,
                 tools=self.openai_tools
             )
@@ -125,11 +123,12 @@ class ToolManager:
             if not response:
                 return "LLM call failed"
 
+            print(response)
             if response["type"] == "message":
                 return response["content"]
 
             # Handle tool calls
-            tool_results = asyncio.run(self._handle_tool_calls(response["tool_calls"]))
+            tool_results = self._handle_tool_calls(response["tool_calls"])
 
             # Add tool execution results to message history
             messages.append({
@@ -143,13 +142,15 @@ class ToolManager:
             })
 
 
-async def main():
+def main():
     # 创建工具管理器
     tool_manager = ToolManager()
 
     # 设置项目路径和查询
-    project_path = "/home/looper/workspace/chat-codebase"
-    query = "这个项目有哪些 tools"
+    project_path = os.path.expanduser("~/workspace/code-agent")
+    query = "这个项目有哪些给模型调用的 tools"
+
+    tool_manager.repository.index(project_path)
 
     # 执行查询并打印结果
     result = tool_manager.query_with_tools(project_path, query)
@@ -158,4 +159,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

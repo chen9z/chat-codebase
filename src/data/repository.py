@@ -16,9 +16,7 @@ class Repository:
             model: EmbeddingModel,
             vector_client: QdrantClient,
             rerank_model: Optional[RerankModel] = None,
-            persist_dir: str = "./storage"
     ):
-        self.persist_dir = persist_dir
         self.model = model
         self.vector_client = vector_client
         self.embedding_dimension = self.model.get_embedding_dimension()

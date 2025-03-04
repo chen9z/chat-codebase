@@ -1,8 +1,8 @@
-from typing import Any, Dict, List
-import os
 from pathlib import Path
+from typing import Any, Dict
 
 from .base import BaseTool
+
 
 class ListDirTool(BaseTool):
     """Tool for listing directory contents with detailed information."""
@@ -20,6 +20,7 @@ class ListDirTool(BaseTool):
     @property
     def parameters(self) -> Dict[str, Any]:
         return {
+            "type": "object",
             "properties": {
                 "directory_path": {
                     "type": "string",
@@ -29,7 +30,7 @@ class ListDirTool(BaseTool):
             "required": ["directory_path"]
         }
 
-    async def execute(self, directory_path: str) -> Dict[str, Any]:
+    def execute(self, directory_path: str) -> Dict[str, Any]:
         """List directory contents with detailed information.
         
         Args:
@@ -87,4 +88,8 @@ class ListDirTool(BaseTool):
             return {
                 "error": f"Error listing directory {directory_path}: {str(e)}",
                 "contents": []
-            } 
+            }
+
+
+if __name__ == '__main__':
+    pass

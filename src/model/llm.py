@@ -1,3 +1,4 @@
+import json
 import os
 
 import dotenv
@@ -30,8 +31,8 @@ class LLMClient:
         except Exception as e:
             print(f"Error in LLMClient: {str(e)}")
             return None
-        
-    def _stream_response(self,response):
+
+    def _stream_response(self, response):
         for chunk in response:
             if chunk.choices[0].delta.content is not None:
                 yield chunk.choices[0].delta.content
@@ -44,7 +45,8 @@ class LLMClient:
                 temperature=temperature,
                 messages=messages,
                 tools=tools,
-                tool_choice="auto"
+                tool_choice="auto",
+                stream=False
             )
 
             message = response.choices[0].message
