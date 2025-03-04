@@ -1,8 +1,7 @@
-from typing import Any, Dict, List, Optional
 import subprocess
-from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from .base import BaseTool
+from src.tools.base import BaseTool
 
 
 class GrepSearchTool(BaseTool):
@@ -127,3 +126,17 @@ class GrepSearchTool(BaseTool):
                 "error": f"Unexpected error: {str(e)}",
                 "matches": []
             }
+
+
+if __name__ == '__main__':
+    tool = GrepSearchTool()
+
+    # Test case 1: Search for "class" in the current directory
+    print("\n1. Searching for 'class' in current directory:")
+    result = tool.execute(query="class", search_directory=".")
+    print(result)
+
+    # Test case 2: Search for "def" in the src directory
+    print("\n2. Searching for 'def' in the src directory:")
+    result = tool.execute(query="def", search_directory="src")
+    print(result)

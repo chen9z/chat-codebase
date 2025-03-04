@@ -61,7 +61,7 @@ class FindByNameTool(BaseTool):
             "required": ["search_directory", "pattern"]
         }
 
-    async def execute(
+    def execute(
             self,
             search_directory: str,
             pattern: str,
@@ -138,7 +138,7 @@ class FindByNameTool(BaseTool):
                             "path": str_path,
                             "type": "file" if item_path.is_file() else "directory",
                             "size": stat.st_size if item_path.is_file() else None,
-                            "modified": datetime.fromtimestamp(stat.st_mtime).isoformat()
+                            # "modified": datetime.fromtimestamp(stat.st_mtime).isoformat()
                         })
                         print(f"Added to matches")
                     except (OSError, PermissionError):
@@ -158,8 +158,7 @@ class FindByNameTool(BaseTool):
             }
 
 
-def main():
-    """Test the FindByNameTool with various scenarios."""
+if __name__ == "__main__":
     tool = FindByNameTool()
 
     # Test case 1: Find all Python files
@@ -180,7 +179,3 @@ def main():
         type="file"
     )
     print(json.dumps(result, indent=2))
-
-
-if __name__ == "__main__":
-    main()

@@ -1,7 +1,8 @@
+import json
 from pathlib import Path
 from typing import Any, Dict
 
-from .base import BaseTool
+from src.tools.base import BaseTool
 
 
 class ListDirTool(BaseTool):
@@ -58,10 +59,10 @@ class ListDirTool(BaseTool):
                 if item.is_file():
                     try:
                         item_info["size"] = item.stat().st_size
-                        item_info["last_modified"] = item.stat().st_mtime
+                        # item_info["last_modified"] = item.stat().st_mtime
                     except OSError:
                         item_info["size"] = 0
-                        item_info["last_modified"] = 0
+                        # item_info["last_modified"] = 0
                 elif item.is_dir():
                     try:
                         # Count number of items in directory (non-recursive)
@@ -92,4 +93,6 @@ class ListDirTool(BaseTool):
 
 
 if __name__ == '__main__':
-    pass
+    tool = ListDirTool()
+    result = tool.execute(".")
+    print(json.dumps(result, indent=2))

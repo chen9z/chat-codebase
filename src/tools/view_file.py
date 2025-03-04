@@ -1,7 +1,8 @@
-from typing import Any, Dict, List, Optional
+import json
 from pathlib import Path
+from typing import Any, Dict
 
-from .base import BaseTool
+from src.tools.base import BaseTool
 
 
 class ViewFileTool(BaseTool):
@@ -118,3 +119,15 @@ class ViewFileTool(BaseTool):
                 "error": f"Error reading file {file_path}: {str(e)}",
                 "contents": None
             }
+
+if __name__ == '__main__':
+    tool = ViewFileTool()
+
+    # Test case 1: View a Python file
+    print("\n1. Viewing a Python file:")
+    result = tool.execute(
+        file_path="./view_file.py",
+        start_line=0,
+        end_line=10
+    )
+    print(json.dumps(result, indent=2))

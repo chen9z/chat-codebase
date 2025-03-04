@@ -79,6 +79,7 @@ class Repository:
             return []
 
         documents = [Document(**result.payload) for result in search_results]
+        # Second stage: Rerank
         reranked_docs = self.rerank_model.rerank(query, documents, limit=limit)
         return reranked_docs
 

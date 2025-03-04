@@ -1,10 +1,14 @@
+import os
 from abc import ABC, abstractmethod
 from typing import List
 
+import dotenv
 import requests
 from transformers import AutoModelForSequenceClassification
 
 from src.data.splitter import Document
+
+dotenv.load_dotenv()
 
 
 class RerankModel(ABC):
@@ -20,12 +24,12 @@ class RerankAPIModel(RerankModel):
     """Jina AI rerank model implementation."""
 
     def __init__(self):
-        pass
+        self.rerank_url = os.getenv("RERANK_URL")
 
     def rerank(self, query: str, documents: List[Document], limit: int = 10) -> List[Document]:
         headers = {"Content-Type": "application/json"}
         try:
-            response = requests.post("http://10.245.29.174:8080/v1/rerank",
+            response = requests.post(f"{self.rerank_url}/v1/rerank",
                                      json={
                                          "query": query,
                                          "documents": [doc.content for doc in documents],

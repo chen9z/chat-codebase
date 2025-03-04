@@ -114,11 +114,12 @@ class CodebaseSearchTool(BaseTool):
             raise Exception(f"Failed to index project: {str(e)}")
 
 
-async def main():
+def main():
     project_dir = os.path.expanduser("~/workspace/spring-ai")
-    qdrant_client = QdrantClient(path="./storage")
-    tool = CodebaseSearchTool(embedding_model=OpenAILikeEmbeddingModel(), rerank_model=RerankAPIModel(),
-                              vector_client=qdrant_client)
+    repository = Repository(model=OpenAILikeEmbeddingModel(),
+                            vector_client=QdrantClient(path="../../storage"),
+                            rerank_model=RerankAPIModel())
+    tool = CodebaseSearchTool(repository=repository)
     tool.index_project(project_dir)
     result = tool.execute(project_dir.split("/")[-1], 'spring ai 是什么？', 5)
     print(result)

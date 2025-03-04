@@ -1,9 +1,8 @@
-import asyncio
 import json
 from pathlib import Path
 from typing import Any, Dict
 
-from src.tools.base import BaseTool  # Try relative import first
+from src.tools.base import BaseTool
 
 
 class RelatedFilesTool(BaseTool):
@@ -115,7 +114,7 @@ class RelatedFilesTool(BaseTool):
             }
 
 
-def main():
+if __name__ == "__main__":
     """Test the RelatedFilesTool with various scenarios."""
     tool = RelatedFilesTool()
 
@@ -125,7 +124,3 @@ def main():
         file_path="base.py"
     )
     print(json.dumps(result, indent=2))
-
-
-if __name__ == "__main__":
-    pass

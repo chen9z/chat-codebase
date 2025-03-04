@@ -21,10 +21,18 @@ def is_support_file(file_path: str) -> bool:
     return os.path.splitext(file_path)[1] in [
         ".java",
         ".xml",
-        "yml",
+        ".yml",
         ".yaml",
         ".properties",
+        ".sql",
         ".md",
+        ".js",
+        ".ts",
+        ".css",
+        ".html",
+        ".vue",
+        ".py",
+        ".go"
     ]
 
 
@@ -187,5 +195,4 @@ def parse(file_path: str) -> list[Document]:
 
 
 if __name__ == "__main__":
-    # 这个部分可以移除，因为我们现在使用 FastAPI 处理请求
     pass
