@@ -5,9 +5,9 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct, VectorParams, Distance
 
 from src.data import splitter
+from src.data.splitter import Document
 from src.model.embedding import EmbeddingModel
 from src.model.reranker import RerankModel, LocalRerankModel
-from src.data.splitter import is_support_file, Document
 
 
 class Repository:
@@ -88,3 +88,22 @@ def traverse_files(dir_path: str):
     for root, dirs, files in os.walk(dir_path):
         for file in files:
             yield os.path.join(root, file)
+
+
+def is_support_file(file_path: str) -> bool:
+    return os.path.splitext(file_path)[1] in [
+        ".java",
+        ".xml",
+        ".yml",
+        ".yaml",
+        ".properties",
+        ".sql",
+        ".md",
+        ".js",
+        ".ts",
+        ".css",
+        ".html",
+        ".vue",
+        ".py",
+        ".go"
+    ]
