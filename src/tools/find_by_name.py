@@ -85,7 +85,6 @@ class FindByNameTool(BaseTool):
         """
         try:
             base_path = Path(search_directory).resolve()  # Get absolute path
-            print(f"Searching in directory: {base_path}")
             if not base_path.is_dir():
                 return {
                     "error": f"Search directory {search_directory} is not a directory",
@@ -94,10 +93,6 @@ class FindByNameTool(BaseTool):
 
             matches = []
             for root, dirs, files in os.walk(base_path):
-                # Print debug info
-                print(f"Scanning directory: {root}")
-                print(f"Found files: {files}")
-
                 # Check depth limit
                 if max_depth is not None:
                     current_depth = len(Path(root).relative_to(base_path).parts)
@@ -112,23 +107,16 @@ class FindByNameTool(BaseTool):
                     rel_path = item_path.relative_to(base_path)
                     str_path = str(rel_path)
 
-                    # Print debug info
-                    print(f"Checking file: {str_path}")
-                    print(f"Against pattern: {pattern}")
-
                     # Apply pattern matching
                     if not fnmatch(str_path, pattern):
-                        print(f"Pattern did not match")
                         continue
 
                     # Check includes
                     if includes and not any(fnmatch(str_path, inc) for inc in includes):
-                        print(f"Not in includes list")
                         continue
 
                     # Check excludes
                     if excludes and any(fnmatch(str_path, exc) for exc in excludes):
-                        print(f"In excludes list")
                         continue
 
                     # Get file information
@@ -140,7 +128,6 @@ class FindByNameTool(BaseTool):
                             "size": stat.st_size if item_path.is_file() else None,
                             # "modified": datetime.fromtimestamp(stat.st_mtime).isoformat()
                         })
-                        print(f"Added to matches")
                     except (OSError, PermissionError):
                         print(f"Failed to get file info")
                         continue

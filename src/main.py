@@ -1,4 +1,3 @@
-import asyncio
 import json
 import os
 from typing import Dict
@@ -6,6 +5,7 @@ from typing import Dict
 import dotenv
 from qdrant_client import QdrantClient
 
+from config.settings import SYSTEM_PROMPT_WITH_TOOLS
 from src.data.repository import Repository
 from src.model.embedding import OpenAILikeEmbeddingModel
 from src.model.llm import LLMClient
@@ -23,7 +23,7 @@ from src.tools import (
 dotenv.load_dotenv()
 
 
-class ToolManager:
+class Agent:
     """管理工具集合和LLM交互的类"""
 
     def __init__(self):
@@ -105,7 +105,7 @@ class ToolManager:
         messages = [
             {
                 "role": "system",
-                "content": "You are an AI assistant that helps users understand codebases. Please use the provided tools to answer user questions."
+                "content": SYSTEM_PROMPT_WITH_TOOLS
             },
             {
                 "role": "user",
@@ -129,6 +129,7 @@ class ToolManager:
 
             # Handle tool calls
             tool_results = self._handle_tool_calls(response["tool_calls"])
+            print(f"Tool results: {tool_results}")
 
             # Add tool execution results to message history
             messages.append({
@@ -144,16 +145,16 @@ class ToolManager:
 
 def main():
     # 创建工具管理器
-    tool_manager = ToolManager()
+    agent = Agent()
 
     # 设置项目路径和查询
-    project_path = os.path.expanduser("~/workspace/code-agent")
-    query = "这个项目有哪些给模型调用的 tools"
+    project_path = os.path.expanduser("~/workspace/spring-ai")
+    query = "spring-ai 支持哪些 LLM? 支持哪些 Embedding 模型？"
 
-    tool_manager.repository.index(project_path)
+    agent.repository.index(project_path)
 
     # 执行查询并打印结果
-    result = tool_manager.query_with_tools(project_path, query)
+    result = agent.query_with_tools(project_path, query)
     print("\nQuery result:")
     print(result)
 

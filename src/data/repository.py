@@ -15,7 +15,7 @@ class Repository:
             self,
             model: EmbeddingModel,
             vector_client: QdrantClient,
-            rerank_model: Optional[RerankModel] = None,
+            rerank_model: RerankModel,
     ):
         self.model = model
         self.vector_client = vector_client
@@ -70,7 +70,7 @@ class Repository:
         # First stage: Vector similarity search
         q_embeddings = self.model.get_embedding(query)
         search_results = self.vector_client.search(
-            project_name,
+            os.path.basename(project_name),  # 模型调用时，会传入绝对路径，取目录名
             q_embeddings,
             limit=limit * 2
         )
