@@ -5,39 +5,6 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Base paths
-BASE_DIR = Path(__file__).resolve().parent.parent
-STORAGE_DIR = BASE_DIR / "storage"
-
-# Model configurations
-EMBEDDING_MODEL = {
-    "local": {
-        "model_name": "jinaai/jina-reranker-v2-base-multilingual",
-        "model_args": {"torch_dtype": "auto"},
-    }
-}
-
-RERANK_MODEL = {
-    "local": {
-        "model_name": "jinaai/jina-reranker-v2-base-multilingual",
-        "model_args": {"torch_dtype": "auto"},
-    }
-}
-
-LLM_MODEL = {
-    "default": "qwen2.5-coder:14b-instruct-q6_K",
-}
-
-# Vector DB configurations
-VECTOR_DB = {
-    "path": str(STORAGE_DIR),
-}
-
-# API configurations
-API_SETTINGS = {
-    "timeout": int(os.getenv("API_TIMEOUT", 30)),
-}
-
 # System prompts
 SYSTEM_PROMPT = """
 You are a large language AI assistant. You are given a user question, and please write clean, concise and accurate answer to the question.
@@ -82,3 +49,19 @@ If you need to see the output of previous tools before continuing, simply stop a
   5. NEVER lie or make things up. 
  </communication>
 """
+
+# ext to language mapping
+ext_to_lang = {
+    ".py": "python",
+    ".java": "java",
+    ".js": "javascript",
+    ".ts": "typescript",
+    ".go": "go",
+    ".html": "html",
+    ".css": "css",
+    ".md": "markdown",
+    ".json": "json",
+    ".yml": "yaml",
+    ".yaml": "yaml",
+    ".xml": "xml",
+}

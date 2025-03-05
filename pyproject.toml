@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "openai>=1.65.2",
+    "pytest>=8.3.5",
     "python-dotenv>=1.0.1",
     "qdrant-client>=1.13.2",
     "semantic-text-splitter>=0.24.1",

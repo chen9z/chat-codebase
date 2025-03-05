@@ -3,7 +3,9 @@ import os
 import uuid
 import warnings
 from dataclasses import dataclass
+from pathlib import Path
 from typing import List
+import config.settings as settings
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -175,9 +177,9 @@ class CodeSpliter(BaseSplitter):
 
 def get_splitter_parser(file_path: str) -> BaseSplitter:
     try:
-        lang = file_path.split(".")[-1]
-        language = get_language(lang)
-        if language:
+        suffix = Path(file_path).suffix
+        lang = settings.ext_to_lang.get(suffix)
+        if lang:
             return CodeSpliter(chunk_size=2000, chunk_overlap=0, lang=lang)
     except Exception as e:
         logging.warn(f"Failed to get language for file: {file_path}")
