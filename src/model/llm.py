@@ -66,6 +66,7 @@ class LLMClient:
 
         except Exception as e:
             print(f"Error in LLMClient tool call: {str(e)}")
+            print(json.dumps(messages, indent=2))
             return None
 
 

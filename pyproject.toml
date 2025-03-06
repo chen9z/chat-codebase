@@ -1,16 +1,67 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "code-agent"
 version = "0.1.0"
-description = "Add your description here"
+description = "An agent-based system for code repository management and analysis"
 readme = "README.md"
-requires-python = ">=3.11"
-dependencies = [
-    "openai>=1.65.2",
-    "pytest>=8.3.5",
-    "python-dotenv>=1.0.1",
-    "qdrant-client>=1.13.2",
-    "semantic-text-splitter>=0.24.1",
-    "transformers>=4.49.0",
-    "tree-sitter==0.21.3",
-    "tree-sitter-languages>=1.10.2",
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Code Agent Team"}
 ]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "qdrant-client",
+    "python-dotenv",
+    "openai>=1.0.0",
+    "pydantic>=2.0.0",
+    "langchain>=0.0.300",
+    "tiktoken",
+    "numpy",
+    "tqdm",
+    "tenacity",
+    "rich",
+    "typer[all]"
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "isort",
+    "mypy",
+    "pytest",
+    "pytest-cov",
+    "ruff",
+]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[project.scripts]
+code-agent = "code_agent.main:app"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

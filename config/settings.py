@@ -1,10 +1,3 @@
-from pathlib import Path
-import os
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
-
 # System prompts
 SYSTEM_PROMPT = """
 You are a large language AI assistant. You are given a user question, and please write clean, concise and accurate answer to the question.
@@ -63,5 +56,5 @@ ext_to_lang = {
     ".json": "json",
     ".yml": "yaml",
     ".yaml": "yaml",
-    ".xml": "xml",
+    # ".xml": "xml",
 }

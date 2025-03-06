@@ -59,7 +59,7 @@ class DefaultSplitter(BaseSplitter):
                 # Create a new chunk
                 chunks.append(
                     Document(
-                        chunk_id=str(uuid.uuid4()),
+                        chunk_id="",
                         path=path,
                         content=current_chunk.strip(),
                         score=0.0,  # Initialize score as 0
@@ -101,7 +101,7 @@ class CodeSpliter(BaseSplitter):
         self.lang = lang
 
     def _create_document(self, path, text, start, end) -> Document:
-        return Document(chunk_id='', path=path, content=text[start:end], start_line=start, end_line=end)
+        return Document(chunk_id="", path=path, content=text[start:end], start_line=start, end_line=end)
 
     def _get_line_number(self, source_code: str, index: int) -> int:
         total_chars = 0
@@ -122,10 +122,7 @@ class CodeSpliter(BaseSplitter):
                     new_chunks.append(current_chunk)
                 current_chunk = Span(chunk.start, chunk.end)
         if current_chunk.end > current_chunk.start:
-            if current_chunk.end - current_chunk.start < self.chunk_size:
-                new_chunks[-1].end = current_chunk.end
-            else:
-                new_chunks.append(current_chunk)
+            new_chunks.append(current_chunk)
         return new_chunks
 
     def _connect_chunks(self, chunks: List[Span]):

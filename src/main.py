@@ -148,9 +148,11 @@ def main():
     agent = Agent()
 
     # 设置项目路径和查询
-    project_path = os.path.expanduser("~/workspace/spring-ai")
-    query = "spring-ai 支持哪些 LLM? 支持哪些 Embedding 模型？"
+    # project_path = os.path.expanduser("~/workspace/spring-ai")
+    # query = "spring-ai 支持哪些 LLM? 支持哪些 Embedding 模型？给出详细的调研"
 
+    project_path = os.path.expanduser("~/workspace/code-agent")
+    query = "这个项目是做什么的？给出详细介绍"
     agent.repository.index(project_path)
 
     # 执行查询并打印结果

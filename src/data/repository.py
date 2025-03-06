@@ -1,5 +1,6 @@
 import os.path
-from typing import Optional, List
+import uuid
+from typing import List
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct, VectorParams, Distance
@@ -8,6 +9,12 @@ from src.data import splitter
 from src.data.splitter import Document
 from src.model.embedding import EmbeddingModel
 from src.model.reranker import RerankModel, LocalRerankModel
+
+IGNORED_DIRS = {".git", ".idea", ".vscode", "__pycache__", "venv", "node_modules", ".venv", ".pytest_cache"}
+SUPPORTED_EXTENSIONS = {
+    ".java", ".xml", ".yml", ".yaml", ".properties", ".sql", ".md",
+    ".js", ".ts", ".css", ".html", ".vue", ".py", ".go"
+}
 
 
 class Repository:
@@ -44,16 +51,15 @@ class Repository:
         points = []
         file_paths = traverse_files(project_dir)
         for file_path in file_paths:
-            if is_support_file(file_path):
-                documents = splitter.parse(file_path)
-                for document in documents:
-                    embeddings = self.model.get_embedding(document.content)
-                    point = PointStruct(
-                        id=document.chunk_id,
-                        vector=embeddings,
-                        payload=document.__dict__
-                    )
-                    points.append(point)
+            documents = splitter.parse(file_path)
+            for document in documents:
+                embeddings = self.model.get_embedding(document.content)
+                point = PointStruct(
+                    id=str(uuid.uuid4()),
+                    vector=embeddings,
+                    payload=document.__dict__
+                )
+                points.append(point)
 
         if points:
             operation = self.vector_client.upsert(
@@ -85,25 +91,29 @@ class Repository:
 
 
 def traverse_files(dir_path: str):
-    for root, dirs, files in os.walk(dir_path):
+    """
+    Traverses all files in the given directory, skipping ignored directories.
+    Returns only files with supported extensions.
+    """
+    for root, dirs, files in os.walk(dir_path, topdown=True):
+        # Modify dirs in-place to skip ignored directories efficiently
+        dirs[:] = [d for d in dirs if d not in IGNORED_DIRS]
+
         for file in files:
-            yield os.path.join(root, file)
+            file_path = os.path.join(root, file)
+            if os.path.splitext(file_path)[1] in SUPPORTED_EXTENSIONS:
+                yield file_path
 
 
 def is_support_file(file_path: str) -> bool:
-    return os.path.splitext(file_path)[1] in [
-        ".java",
-        ".xml",
-        ".yml",
-        ".yaml",
-        ".properties",
-        ".sql",
-        ".md",
-        ".js",
-        ".ts",
-        ".css",
-        ".html",
-        ".vue",
-        ".py",
-        ".go"
-    ]
+    """
+    Checks if a file has a supported extension.
+    Note: Directory filtering is now handled in traverse_files.
+    """
+    return os.path.splitext(file_path)[1] in SUPPORTED_EXTENSIONS
+
+
+if __name__ == '__main__':
+    files = traverse_files(os.path.expanduser("~/workspace/code-agent"))
+    for file in files:
+        print(file)
