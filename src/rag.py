@@ -12,7 +12,7 @@ from src.data.repository import Repository
 from src.data.splitter import Document
 
 
-class Application:
+class RAG:
     """Main application class for code search and QA."""
 
     def __init__(
@@ -94,10 +94,10 @@ class Application:
 
 
 if __name__ == '__main__':
-    app = Application(llm_client=LLMClient(base_url=os.getenv("OPENAI_API_BASE"), api_key=os.getenv("OPENAI_API_KEY")),
-                      model="deepseek-chat",
-                      embedding_model=OpenAILikeEmbeddingModel(),
-                      rerank_model=RerankAPIModel())
+    app = RAG(llm_client=LLMClient(base_url=os.getenv("OPENAI_API_BASE"), api_key=os.getenv("OPENAI_API_KEY")),
+              model="deepseek-chat",
+              embedding_model=OpenAILikeEmbeddingModel(),
+              rerank_model=RerankAPIModel())
 
     project_path = os.path.expanduser("~/workspace/spring-ai")
     project_name = project_path.split("/")[-1]
