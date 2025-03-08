@@ -60,7 +60,7 @@ RERANK_URL: <your-rerank-url>
 1. 运行主程序：
 
 ```bash
-python src/main.py
+python main.py
 ```
 
 ## 许可证
