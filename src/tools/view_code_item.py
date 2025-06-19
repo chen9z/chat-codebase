@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import tree_sitter
-import config.settings as settings
+from src.config import settings
 from tree_sitter_languages import get_parser
 
 from src.tools.base import BaseTool
@@ -39,7 +39,12 @@ class ViewCodeItemTool(BaseTool):
 
     def _get_parser_for_file(self, file_path):
         lang = settings.ext_to_lang.get(Path(file_path).suffix)
-        return get_parser(lang)
+        if lang is None:
+            return None
+        try:
+            return get_parser(lang)
+        except Exception:
+            return None
 
     def execute(self, file_path: str, node_name: str) -> Dict[str, Any]:
         """View a specific code item from a file.

@@ -5,7 +5,7 @@ from typing import Dict
 import dotenv
 from qdrant_client import QdrantClient
 
-from config.settings import SYSTEM_PROMPT_WITH_TOOLS
+from src.config.settings import SYSTEM_PROMPT_WITH_TOOLS
 from src.data.repository import Repository
 from src.model.embedding import OpenAILikeEmbeddingModel
 from src.model.llm import LLMClient

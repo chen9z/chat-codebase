@@ -1,15 +1,45 @@
 import logging
 import os
+import sys
 import uuid
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List
-import config.settings as settings
+
+# Third party imports
+from tree_sitter_languages import get_language, get_parser
+
+# Local imports
+from src.config import settings
+from src.config.parser_config import (
+    is_semantic_boundary,
+    is_comment_node,
+    is_documentation_comment
+)
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
-from tree_sitter_languages import get_language, get_parser
+
+# Parser cache to avoid recreating parsers
+_parser_cache = {}
+
+
+def get_cached_parser(language: str):
+    """Get a cached parser for the given language."""
+    if language not in _parser_cache:
+        try:
+            # Try the new API first
+            lang = get_language(language)
+            _parser_cache[language] = lang.parser()
+        except Exception as e1:
+            try:
+                # Fallback to old API
+                _parser_cache[language] = get_parser(language)
+            except Exception as e2:
+                logging.warning(f"Failed to create parser for language {language}: {e1}, {e2}")
+                return None
+    return _parser_cache[language]
 
 
 @dataclass
@@ -129,11 +159,82 @@ class CodeSpliter(BaseSplitter):
         for pre, cur in zip(chunks[:-1], chunks[1:]):
             pre.end = cur.start
 
+    def _is_semantic_boundary(self, node) -> bool:
+        """Check if a node represents a semantic boundary (class, function, etc.)."""
+        return is_semantic_boundary(node.type, self.lang)
+
+    def _find_associated_comments(self, semantic_node, all_nodes, text) -> List:
+        """Find comments that should be associated with a semantic node (like Javadoc for methods)."""
+        associated_comments = []
+        semantic_start = semantic_node.start_byte
+
+        # Look for comments that appear immediately before the semantic node
+        for node in all_nodes:
+            if is_comment_node(node.type, self.lang):
+                # Check if this comment is immediately before the semantic node
+                # Allow for some whitespace between comment and semantic node
+                comment_end = node.end_byte
+
+                # Get text between comment and semantic node
+                between_text = text[comment_end:semantic_start].strip()
+
+                # If there's only whitespace between comment and semantic node,
+                # and the comment is a documentation comment, associate them
+                if (not between_text or between_text.isspace()) and \
+                   is_documentation_comment(node.type, self.lang):
+                    associated_comments.append(node)
+                elif comment_end < semantic_start and \
+                     semantic_start - comment_end < 200:  # Within 200 chars
+                    # For line comments immediately before semantic nodes
+                    lines_between = text[comment_end:semantic_start].count('\n')
+                    if lines_between <= 2:  # At most 2 newlines between
+                        associated_comments.append(node)
+
+        return associated_comments
+
+    def _get_extended_span_with_comments(self, semantic_node, all_nodes, text) -> Span:
+        """Get a span that includes the semantic node and its associated comments."""
+        associated_comments = self._find_associated_comments(semantic_node, all_nodes, text)
+
+        if not associated_comments:
+            return Span(semantic_node.start_byte, semantic_node.end_byte)
+
+        # Find the earliest comment start and latest semantic node end
+        min_start = min(comment.start_byte for comment in associated_comments)
+        min_start = min(min_start, semantic_node.start_byte)
+        max_end = max(semantic_node.end_byte,
+                     max(comment.end_byte for comment in associated_comments))
+
+        return Span(min_start, max_end)
+
+    def _collect_all_nodes(self, node) -> List:
+        """Recursively collect all nodes in the tree."""
+        nodes = [node]
+        for child in node.children:
+            nodes.extend(self._collect_all_nodes(child))
+        return nodes
+
     def _chunk_node(self, node, text) -> List[Span]:
         span = Span(node.start_byte, node.start_byte)
         chunks = []
+
+        # Collect all nodes for comment association
+        all_nodes = self._collect_all_nodes(node)
+
         for child in node.children:
-            if child.end_byte - child.start_byte > self.chunk_size:
+            child_size = child.end_byte - child.start_byte
+
+            # If child is a semantic boundary and reasonably sized, treat as separate chunk
+            if self._is_semantic_boundary(child) and child_size <= self.chunk_size * 1.5:
+                if span.end > span.start:
+                    chunks.append(span)
+
+                # Get extended span that includes associated comments
+                extended_span = self._get_extended_span_with_comments(child, all_nodes, text)
+                chunks.append(extended_span)
+                span = Span(extended_span.end, extended_span.end)
+
+            elif child_size > self.chunk_size:
                 if span.end > span.start:
                     chunks.append(span)
                 span = Span(child.end_byte, child.end_byte)
@@ -152,24 +253,36 @@ class CodeSpliter(BaseSplitter):
         return chunks
 
     def split(self, path: str, text: str) -> list[Document]:
-        parser = get_parser(language=self.lang)
-        tree = parser.parse(bytes(text, 'utf-8'))
+        try:
+            parser = get_cached_parser(self.lang)
+            if parser is None:
+                logging.warning(f"No parser available for language: {self.lang}, falling back to default splitter")
+                fallback_splitter = DefaultSplitter(self.chunk_size, self.chunk_overlap)
+                return fallback_splitter.split(path, text)
 
-        root_node = tree.root_node
-        if not root_node or not root_node or root_node.type == "ERROR":
-            logging.error(f"Failed to parse {path}")
-            return []
+            tree = parser.parse(bytes(text, 'utf-8'))
+            root_node = tree.root_node
 
-        spans = self._chunk_node(root_node, text)
-        self._connect_chunks(spans)
-        spans = self._coalesce_chunks(spans)
+            if not root_node or root_node.type == "ERROR":
+                logging.warning(f"Parse error for {path}, falling back to default splitter")
+                fallback_splitter = DefaultSplitter(self.chunk_size, self.chunk_overlap)
+                return fallback_splitter.split(path, text)
 
-        documents = []
-        for span in spans:
-            documents.append(Document(chunk_id='', path=path, content=text[span.start:span.end],
-                                      start_line=self._get_line_number(text, span.start),
-                                      end_line=self._get_line_number(text, span.end)))
-        return documents
+            spans = self._chunk_node(root_node, text)
+            self._connect_chunks(spans)
+            spans = self._coalesce_chunks(spans)
+
+            documents = []
+            for span in spans:
+                documents.append(Document(chunk_id='', path=path, content=text[span.start:span.end],
+                                          start_line=self._get_line_number(text, span.start),
+                                          end_line=self._get_line_number(text, span.end)))
+            return documents
+
+        except Exception as e:
+            logging.error(f"Unexpected error parsing {path}: {e}, falling back to default splitter")
+            fallback_splitter = DefaultSplitter(self.chunk_size, self.chunk_overlap)
+            return fallback_splitter.split(path, text)
 
 
 def get_splitter_parser(file_path: str) -> BaseSplitter:

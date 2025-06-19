@@ -1,10 +1,16 @@
 import os
+import sys
 from pathlib import Path
 from typing import Generator, Optional, List
 
+# Add project root to Python path when running as script
+if __name__ == '__main__':
+    project_root = Path(__file__).parent.parent
+    sys.path.insert(0, str(project_root))
+
 from qdrant_client import QdrantClient
 
-import config.settings
+from src.config import settings
 from src.model.embedding import JinaCodeEmbeddingModel, OpenAILikeEmbeddingModel
 from src.model.llm import LLMClient
 from src.model.reranker import RerankModel, LocalRerankModel, RerankAPIModel
@@ -79,11 +85,11 @@ class RAG:
         messages = [
             {
                 "role": "system",
-                "content": config.settings.SYSTEM_PROMPT
+                "content": settings.SYSTEM_PROMPT
             },
             {
                 "role": "user",
-                "content": config.settings.USER_PROMPT_TEMPLATE.format(context=context, query=query)
+                "content": settings.USER_PROMPT_TEMPLATE.format(context=context, query=query)
             }
         ]
 
@@ -94,13 +100,45 @@ class RAG:
 
 
 if __name__ == '__main__':
-    app = RAG(llm_client=LLMClient(base_url=os.getenv("OPENAI_API_BASE"), api_key=os.getenv("OPENAI_API_KEY")),
-              model="deepseek-chat",
-              embedding_model=OpenAILikeEmbeddingModel(),
-              rerank_model=RerankAPIModel())
+    try:
+        print("🚀 启动 RAG 应用...")
 
-    project_path = os.path.expanduser("~/workspace/spring-ai")
-    project_name = project_path.split("/")[-1]
-    app.index_project(project_path)
-    response = app.query(project_name, "spring ai 是什么？")
-    print("Response:", response)
+        # 检查环境变量
+        if not os.getenv("OPENAI_API_BASE") or not os.getenv("OPENAI_API_KEY"):
+            print("❌ 请设置 OPENAI_API_BASE 和 OPENAI_API_KEY 环境变量")
+            exit(1)
+
+        # 创建 RAG 实例
+        app = RAG(
+            llm_client=LLMClient(
+                base_url=os.getenv("OPENAI_API_BASE"),
+                api_key=os.getenv("OPENAI_API_KEY")
+            ),
+            model="deepseek-chat",
+            embedding_model=JinaCodeEmbeddingModel(),
+            rerank_model=LocalRerankModel()
+        )
+
+        project_path = os.path.expanduser("~/workspace/spring-ai")
+        if not os.path.exists(project_path):
+            # 如果示例路径不存在，使用当前项目
+            project_path = str(Path(__file__).parent.parent)
+
+        project_name = project_path.split("/")[-1]
+
+        print(f"📁 索引项目: {project_path}")
+        app.index_project(project_path)
+
+        print("❓ 查询: spring ai 是什么？")
+        response = app.query(project_name, "spring ai 是什么？")
+
+        print("📝 响应:")
+        for chunk in response:
+            print(chunk, end='', flush=True)
+        print()
+
+    except ImportError as e:
+        print(f"❌ 导入错误: {e}")
+        print("💡 提示: 请使用 'uv run python src/rag.py' 或安装缺少的依赖")
+    except Exception as e:
+        print(f"❌ 运行错误: {e}")

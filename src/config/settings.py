@@ -45,16 +45,64 @@ If you need to see the output of previous tools before continuing, simply stop a
 
 # ext to language mapping
 ext_to_lang = {
+    # Python
     ".py": "python",
+    ".pyi": "python",
+    
+    # Java/JVM languages
     ".java": "java",
+    ".kt": "kotlin",
+    ".scala": "scala",
+    
+    # JavaScript/TypeScript
     ".js": "javascript",
+    ".jsx": "javascript",
     ".ts": "typescript",
+    ".tsx": "typescript",
+    ".mjs": "javascript",
+    ".cjs": "javascript",
+    
+    # C/C++
+    ".c": "c",
+    ".h": "c",
+    ".cpp": "cpp",
+    ".cxx": "cpp",
+    ".cc": "cpp",
+    ".hpp": "cpp",
+    ".hxx": "cpp",
+    
+    # Other systems languages
     ".go": "go",
+    ".rs": "rust",
+    ".swift": "swift",
+    
+    # Web technologies
     ".html": "html",
+    ".htm": "html",
     ".css": "css",
+    ".scss": "scss",
+    ".sass": "sass",
+    ".less": "css",
+    
+    # Markup and data
     ".md": "markdown",
+    ".markdown": "markdown",
     ".json": "json",
     ".yml": "yaml",
     ".yaml": "yaml",
-    # ".xml": "xml",
+    ".xml": "xml",
+    ".toml": "toml",
+    
+    # Shell scripts
+    ".sh": "bash",
+    ".bash": "bash",
+    ".zsh": "bash",
+    
+    # Other languages
+    ".rb": "ruby",
+    ".php": "php",
+    ".cs": "c_sharp",
+    ".sql": "sql",
+    ".r": "r",
+    ".R": "r",
 }

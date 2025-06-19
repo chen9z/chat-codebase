@@ -28,7 +28,7 @@ class JinaCodeEmbeddingModel(EmbeddingModel):
 
     def __init__(self):
         self.model = SentenceTransformer(model_name_or_path="jinaai/jina-embeddings-v2-base-code",
-                                         trust_remote_code=True)
+                                        trust_remote_code=True)
 
     def get_embedding(self, text: str) -> List[float]:
         return self.model.encode(text, show_progress_bar=True).tolist()
