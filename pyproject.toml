@@ -25,8 +25,7 @@ dependencies = [
     "tenacity",
     "rich",
     "typer[all]",
-    "tree-sitter==0.21.3",
-    "tree-sitter-languages>=1.10.2",
+    "tree-sitter>=0.21.0",
     "sentence-transformers"
 ]
 
