@@ -676,12 +676,22 @@ class CodeSplitter(BaseSplitter):
             return fallback_splitter.split(path, text)
 
 
-def get_splitter_parser(file_path: str, config: Optional[SplitterConfig] = None) -> BaseSplitter:
-    """获取分片解析器，支持配置化"""
+def get_splitter_parser(file_path: str, config: Optional[SplitterConfig] = None, use_language_specific: bool = True) -> BaseSplitter:
+    """获取分片解析器，支持配置化和语言特定处理"""
     try:
         suffix = Path(file_path).suffix
         lang = settings.ext_to_lang.get(suffix)
-        if lang:
+        
+        if lang and use_language_specific:
+            # 尝试使用语言特定的分片器
+            try:
+                from .language_specific_splitters import get_language_specific_splitter
+                return get_language_specific_splitter(lang, config)
+            except ImportError:
+                logging.warning("Language specific splitters not available, falling back to generic CodeSplitter")
+                return CodeSplitter(chunk_size=2000, chunk_overlap=0, lang=lang, config=config)
+        elif lang:
+            # 使用通用的代码分片器
             return CodeSplitter(chunk_size=2000, chunk_overlap=0, lang=lang, config=config)
     except Exception as e:
         logging.warning(f"Failed to get language for file: {file_path}: {e}")
