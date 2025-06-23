@@ -5,8 +5,9 @@ import uuid
 import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict, Tuple
 from enum import Enum
+from bisect import bisect_left
 
 # Third party imports
 try:
@@ -56,33 +57,38 @@ def get_parser_for_language(language: str):
 
 
 class SemanticType(Enum):
-    """语义类型枚举，包含类型名称和优先级"""
+    """语义类型枚举，包含类型名称、优先级和理想大小"""
     # 高优先级 - 独立性强的语义单元
-    CLASS = ("class", 10)
-    INTERFACE = ("interface", 10)
-    ENUM = ("enum", 9)
-    FUNCTION = ("function", 8)
-    METHOD = ("method", 8)
+    CLASS = ("class", 10, 1000)  # (type_name, priority, ideal_size)
+    INTERFACE = ("interface", 10, 800)
+    ENUM = ("enum", 9, 600)
+    FUNCTION = ("function", 8, 800)
+    METHOD = ("method", 8, 600)
 
     # 中优先级 - 相关的辅助内容
-    CONSTRUCTOR = ("constructor", 6)
-    PROPERTY = ("property", 5)
-    COMMENT_BLOCK = ("comment_block", 4)
+    CONSTRUCTOR = ("constructor", 6, 400)
+    PROPERTY = ("property", 5, 200)
+    COMMENT_BLOCK = ("comment_block", 4, 300)
 
     # 低优先级 - 可合并的内容
-    IMPORT = ("import", 2)
-    VARIABLE = ("variable", 1)
-    OTHER = ("other", 0)
+    IMPORT = ("import", 2, 100)
+    VARIABLE = ("variable", 1, 100)
+    OTHER = ("other", 0, 200)
 
-    def __init__(self, type_name, priority):
+    def __init__(self, type_name, priority, ideal_size):
         self.type_name = type_name
         self.priority = priority
+        self.ideal_size = ideal_size
 
 
 @dataclass
 class Span:
     start: int
     end: int
+    
+    @property
+    def size(self) -> int:
+        return self.end - self.start
 
 
 @dataclass
@@ -94,7 +100,16 @@ class SemanticChunk:
     name: str = ""  # 提取的名称（类名、函数名等）
     associated_comments: List = field(default_factory=list)
     can_merge: bool = True
-    size: int = 0
+    complexity_score: float = 1.0  # 复杂度评分，影响合并决策
+
+    @property
+    def size(self) -> int:
+        return self.span.size
+
+    @property
+    def effective_priority(self) -> float:
+        """计算有效优先级，结合语义优先级和复杂度"""
+        return self.semantic_type.priority + (self.complexity_score * 0.5)
 
 
 @dataclass
@@ -105,6 +120,7 @@ class Document:
     score: float = 0.0
     start_line: int = 0
     end_line: int = 0
+    semantic_info: Dict = field(default_factory=dict)  # 添加语义信息
 
 
 def get_content(path: str) -> str:
@@ -166,31 +182,36 @@ class DefaultSplitter(BaseSplitter):
                         score=0.0,
                         start_line=start_line_num,
                         end_line=start_line_num + len(current_lines) - 1,
+                        semantic_info={"type": "text_chunk", "method": "default"}
                     )
                 )
 
-                # Calculate overlap for next chunk - simplified logic
+                # Calculate overlap for next chunk - optimized logic
                 if self.chunk_overlap > 0 and i < len(lines):
-                    # Calculate how many lines to overlap based on character count
-                    overlap_size = 0
-                    overlap_lines = 0
-
-                    # Start from the end and work backwards
-                    for j in range(len(current_lines) - 1, -1, -1):
-                        line = current_lines[j]
-                        line_size = len(line) + 1  # +1 for newline
-
-                        if overlap_size + line_size <= self.chunk_overlap:
-                            overlap_size += line_size
-                            overlap_lines += 1
-                        else:
-                            break
-
-                    # Move back to create overlap, but ensure we don't go backwards
-                    if overlap_lines > 0 and overlap_lines < len(current_lines):
+                    overlap_lines = self._calculate_overlap_lines(current_lines)
+                    if overlap_lines > 0:
                         i -= overlap_lines
 
         return chunks
+
+    def _calculate_overlap_lines(self, current_lines: List[str]) -> int:
+        """计算重叠行数的优化方法"""
+        overlap_size = 0
+        overlap_lines = 0
+        
+        # 从末尾向前计算重叠
+        for j in range(len(current_lines) - 1, -1, -1):
+            line = current_lines[j]
+            line_size = len(line) + 1  # +1 for newline
+
+            if overlap_size + line_size <= self.chunk_overlap:
+                overlap_size += line_size
+                overlap_lines += 1
+            else:
+                break
+
+        # 确保不会超过当前块的行数
+        return min(overlap_lines, len(current_lines) - 1)
 
 
 class CodeSplitter(BaseSplitter):
@@ -198,6 +219,31 @@ class CodeSplitter(BaseSplitter):
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.lang = lang
+        self._language_config = self._get_language_config(lang)
+
+    def _get_language_config(self, lang: str) -> Dict:
+        """获取语言特定的配置"""
+        configs = {
+            'python': {
+                'class_keywords': ['class'],
+                'function_keywords': ['def', 'async def'],
+                'complexity_indicators': ['if', 'for', 'while', 'try', 'with'],
+                'max_function_size': 1000,
+            },
+            'javascript': {
+                'class_keywords': ['class'],
+                'function_keywords': ['function', 'const', 'let', 'var'],
+                'complexity_indicators': ['if', 'for', 'while', 'try', 'switch'],
+                'max_function_size': 800,
+            },
+            'java': {
+                'class_keywords': ['class', 'interface', 'enum'],
+                'function_keywords': ['public', 'private', 'protected'],
+                'complexity_indicators': ['if', 'for', 'while', 'try', 'switch'],
+                'max_function_size': 1200,
+            },
+        }
+        return configs.get(lang, configs['python'])
 
     def _get_semantic_type(self, node_type: str) -> SemanticType:
         """根据AST节点类型确定语义类型"""
@@ -267,6 +313,26 @@ class CodeSplitter(BaseSplitter):
         except:
             return "unknown"
 
+    def _calculate_complexity_score(self, node, text: str) -> float:
+        """计算代码复杂度评分"""
+        try:
+            node_text = text[node.start_byte:node.end_byte]
+            complexity_indicators = self._language_config.get('complexity_indicators', [])
+            
+            score = 1.0
+            for indicator in complexity_indicators:
+                score += node_text.count(indicator) * 0.1
+            
+            # 根据代码长度调整
+            if len(node_text) > 500:
+                score += 0.5
+            if len(node_text) > 1000:
+                score += 0.5
+                
+            return min(score, 3.0)  # 限制最大复杂度
+        except:
+            return 1.0
+
     def _get_line_number(self, source_code: str, index: int) -> int:
         """Get the line number for a given character index in the source code."""
         if index < 0:
@@ -300,15 +366,18 @@ class CodeSplitter(BaseSplitter):
         return sorted(comments, key=lambda n: n.start_byte)
 
     def _find_comments_for_node(self, semantic_node, all_comments: List, text: str) -> List:
-        """为特定语义节点查找关联的注释"""
+        """为特定语义节点查找关联的注释 - 使用二分查找优化"""
         associated_comments = []
         semantic_start = semantic_node.start_byte
-
+        
+        # 使用二分查找找到第一个可能相关的注释
+        comment_starts = [c.start_byte for c in all_comments]
+        insert_pos = bisect_left(comment_starts, semantic_start)
+        
         # 只检查语义节点之前的注释
-        for comment in all_comments:
-            if comment.end_byte > semantic_start:
-                break  # 注释已排序，后面的都在语义节点之后
-
+        for i in range(min(insert_pos, len(all_comments))):
+            comment = all_comments[i]
+            
             # 检查距离和关联性
             between_text = text[comment.end_byte:semantic_start].strip()
 
@@ -328,22 +397,23 @@ class CodeSplitter(BaseSplitter):
     def _parse_semantic_chunks(self, root_node, text: str) -> List[SemanticChunk]:
         """第一阶段：解析所有语义块"""
         chunks = []
-        comments = self._collect_comments_once(root_node)  # 一次性收集注释
+        comments = self._collect_comments_once(root_node)
 
         def traverse(node):
             if self._is_semantic_boundary(node):
                 semantic_type = self._get_semantic_type(node.type)
                 chunk_size = node.end_byte - node.start_byte
+                complexity_score = self._calculate_complexity_score(node, text)
 
                 chunk = SemanticChunk(
                     span=Span(node.start_byte, node.end_byte),
                     semantic_type=semantic_type,
                     node_type=node.type,
                     name=self._extract_name(node, text),
-                    size=chunk_size
+                    complexity_score=complexity_score
                 )
 
-                # 关联注释（现在只需要为这个特定节点查找）
+                # 关联注释
                 chunk.associated_comments = self._find_comments_for_node(
                     node, comments, text
                 )
@@ -370,13 +440,43 @@ class CodeSplitter(BaseSplitter):
 
         return Span(min_start, max_end)
 
+    def _should_merge_chunks(self, chunk1: SemanticChunk, chunk2: SemanticChunk, 
+                           current_size: int) -> bool:
+        """判断两个语义块是否应该合并"""
+        # 检查大小限制
+        if current_size + chunk2.size > self.chunk_size:
+            return False
+        
+        # 高优先级的大块通常不合并
+        if (chunk2.effective_priority >= 8 and 
+            chunk2.size > chunk2.semantic_type.ideal_size):
+            return False
+            
+        # 类型相似的更容易合并
+        type_compatibility = {
+            (SemanticType.FUNCTION, SemanticType.METHOD): True,
+            (SemanticType.IMPORT, SemanticType.VARIABLE): True,
+            (SemanticType.PROPERTY, SemanticType.VARIABLE): True,
+        }
+        
+        chunk_types = (chunk1.semantic_type, chunk2.semantic_type)
+        if chunk_types in type_compatibility or chunk_types[::-1] in type_compatibility:
+            return True
+            
+        # 同类型的小块容易合并
+        if (chunk1.semantic_type == chunk2.semantic_type and 
+            chunk2.size < chunk2.semantic_type.ideal_size * 0.5):
+            return True
+            
+        return chunk2.effective_priority < 5  # 低优先级的可以合并
+
     def _merge_group(self, group: List[SemanticChunk]) -> List[Span]:
         """合并一组语义块"""
         if not group:
             return []
 
         # 按优先级排序，高优先级的放在前面
-        group.sort(key=lambda c: c.semantic_type.priority, reverse=True)
+        group.sort(key=lambda c: c.effective_priority, reverse=True)
 
         # 计算合并后的范围
         start = min(c.span.start for c in group)
@@ -395,7 +495,7 @@ class CodeSplitter(BaseSplitter):
         return [Span(start, end)]
 
     def _merge_by_priority(self, semantic_chunks: List[SemanticChunk], text: str) -> List[Span]:
-        """第二阶段：按优先级和大小智能合并"""
+        """第二阶段：按优先级和大小智能合并 - 优化版本"""
         if not semantic_chunks:
             return []
 
@@ -403,13 +503,22 @@ class CodeSplitter(BaseSplitter):
         current_group = []
         current_size = 0
 
-        for chunk in semantic_chunks:
+        for i, chunk in enumerate(semantic_chunks):
             chunk_size = chunk.size
 
-            # 高优先级的大块独立成chunk
-            if (chunk.semantic_type.priority >= 8 and
-                chunk_size > self.chunk_size * 0.3):
+            # 检查是否应该独立成块
+            should_be_independent = (
+                chunk.effective_priority >= 8 and 
+                chunk_size > self.chunk_size * 0.3
+            )
 
+            # 检查是否可以与当前组合并
+            can_merge_with_current = (
+                current_group and 
+                self._should_merge_chunks(current_group[-1], chunk, current_size)
+            )
+
+            if should_be_independent:
                 # 先处理当前组
                 if current_group:
                     merged_spans.extend(self._merge_group(current_group))
@@ -419,13 +528,13 @@ class CodeSplitter(BaseSplitter):
                 # 高优先级块独立
                 merged_spans.append(self._create_span_with_comments(chunk))
 
-            # 可以合并的块
-            elif current_size + chunk_size <= self.chunk_size:
+            elif can_merge_with_current:
+                # 与当前组合并
                 current_group.append(chunk)
                 current_size += chunk_size
 
-            # 当前组已满，开始新组
             else:
+                # 开始新组
                 if current_group:
                     merged_spans.extend(self._merge_group(current_group))
 
@@ -441,15 +550,66 @@ class CodeSplitter(BaseSplitter):
     def _create_documents(self, spans: List[Span], path: str, text: str) -> List[Document]:
         """生成最终的文档列表"""
         documents = []
-        for span in spans:
+        for i, span in enumerate(spans):
+            content = text[span.start:span.end]
+            
+            # 分析内容的语义信息
+            semantic_info = self._analyze_chunk_semantics(content)
+            semantic_info.update({
+                "method": "semantic",
+                "chunk_index": i,
+                "total_chunks": len(spans)
+            })
+            
             documents.append(Document(
                 chunk_id=str(uuid.uuid4()),
                 path=path,
-                content=text[span.start:span.end],
+                content=content,
                 start_line=self._get_line_number(text, span.start),
-                end_line=self._get_line_number(text, span.end)
+                end_line=self._get_line_number(text, span.end),
+                semantic_info=semantic_info
             ))
         return documents
+
+    def _analyze_chunk_semantics(self, content: str) -> Dict:
+        """分析代码块的语义信息"""
+        info = {
+            "has_classes": False,
+            "has_functions": False,
+            "has_imports": False,
+            "has_comments": False,
+            "estimated_complexity": "low"
+        }
+        
+        # 简单的关键词检测
+        class_keywords = self._language_config.get('class_keywords', [])
+        function_keywords = self._language_config.get('function_keywords', [])
+        complexity_indicators = self._language_config.get('complexity_indicators', [])
+        
+        for keyword in class_keywords:
+            if keyword in content:
+                info["has_classes"] = True
+                break
+                
+        for keyword in function_keywords:
+            if keyword in content:
+                info["has_functions"] = True
+                break
+                
+        if any(keyword in content for keyword in ["import", "from", "include", "require"]):
+            info["has_imports"] = True
+            
+        if any(indicator in content for indicator in ["#", "//", "/*", '"""', "'''"]):
+            info["has_comments"] = True
+            
+        # 估算复杂度
+        complexity_count = sum(content.count(indicator) for indicator in complexity_indicators)
+        if complexity_count > 10:
+            info["estimated_complexity"] = "high"
+        elif complexity_count > 5:
+            info["estimated_complexity"] = "medium"
+            
+        return info
 
     def split(self, path: str, text: str) -> list[Document]:
         try:
@@ -480,7 +640,10 @@ class CodeSplitter(BaseSplitter):
             merged_spans = self._merge_by_priority(semantic_chunks, text)
 
             # 生成最终文档
-            return self._create_documents(merged_spans, path, text)
+            documents = self._create_documents(merged_spans, path, text)
+            
+            logging.info(f"Split {path} into {len(documents)} semantic chunks")
+            return documents
 
         except Exception as e:
             logging.error(f"Unexpected error parsing {path}: {e}, falling back to default splitter")
@@ -500,9 +663,16 @@ def get_splitter_parser(file_path: str) -> BaseSplitter:
 
 
 def parse(file_path: str) -> list[Document]:
-    splitter = get_splitter_parser(file_path)
-    text = get_content(file_path)
-    return splitter.split(file_path, text)
+    """Parse a file and return a list of documents"""
+    try:
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as file:
+            content = file.read()
+        
+        splitter = get_splitter_parser(file_path)
+        return splitter.split(file_path, content)
+    except Exception as e:
+        logging.error(f"Failed to parse file {file_path}: {e}")
+        return []
 
 
 if __name__ == "__main__":
