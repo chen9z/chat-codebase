@@ -26,7 +26,9 @@ dependencies = [
     "rich",
     "typer[all]",
     "tree-sitter>=0.21.0",
-    "sentence-transformers"
+    "sentence-transformers",
+    "tree-sitter-languages>=1.10.2",
+    "pytest>=8.3.5",
 ]
 
 [project.optional-dependencies]

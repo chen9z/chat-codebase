@@ -30,7 +30,7 @@ class ParserConfig:
 COMMENT_NODE_TYPES: Dict[str, Set[str]] = {
     "java": {
         "line_comment",
-        "block_comment", 
+        "block_comment",
         "javadoc_comment",
     },
     "python": {
@@ -42,13 +42,13 @@ COMMENT_NODE_TYPES: Dict[str, Set[str]] = {
         "block_comment",
     },
     "typescript": {
-        "comment", 
+        "comment",
         "line_comment",
         "block_comment",
     },
     "go": {
         "comment",
-        "line_comment", 
+        "line_comment",
         "block_comment",
     },
     "rust": {
@@ -59,9 +59,40 @@ COMMENT_NODE_TYPES: Dict[str, Set[str]] = {
     "cpp": {
         "comment",
         "line_comment",
-        "block_comment", 
+        "block_comment",
     },
     "c": {
+        "comment",
+        "line_comment",
+        "block_comment",
+    },
+    "csharp": {
+        "comment",
+        "line_comment",
+        "block_comment",
+        "documentation_comment",
+    },
+    "php": {
+        "comment",
+        "line_comment",
+        "block_comment",
+    },
+    "ruby": {
+        "comment",
+        "line_comment",
+        "block_comment",
+    },
+    "swift": {
+        "comment",
+        "line_comment",
+        "block_comment",
+    },
+    "kotlin": {
+        "comment",
+        "line_comment",
+        "block_comment",
+    },
+    "scala": {
         "comment",
         "line_comment",
         "block_comment",
@@ -78,11 +109,12 @@ SEMANTIC_NODE_TYPES: Dict[str, Set[str]] = {
     },
     "java": {
         "class_declaration",
-        "interface_declaration", 
+        "interface_declaration",
         "method_declaration",
         "constructor_declaration",
         "enum_declaration",
         "annotation_type_declaration",
+        "record_declaration",
     },
     "javascript": {
         "class_declaration",
@@ -95,7 +127,7 @@ SEMANTIC_NODE_TYPES: Dict[str, Set[str]] = {
     "typescript": {
         "class_declaration",
         "interface_declaration",
-        "function_declaration", 
+        "function_declaration",
         "method_definition",
         "arrow_function",
         "function_expression",
@@ -111,11 +143,12 @@ SEMANTIC_NODE_TYPES: Dict[str, Set[str]] = {
     },
     "rust": {
         "function_item",
-        "impl_item", 
+        "impl_item",
         "struct_item",
         "enum_item",
         "trait_item",
         "mod_item",
+        "associated_type",
     },
     "cpp": {
         "function_definition",
@@ -123,12 +156,55 @@ SEMANTIC_NODE_TYPES: Dict[str, Set[str]] = {
         "struct_specifier",
         "namespace_definition",
         "template_declaration",
+        "union_specifier",
+        "enum_specifier",
     },
     "c": {
         "function_definition",
         "struct_specifier",
         "union_specifier",
         "enum_specifier",
+    },
+    "csharp": {
+        "class_declaration",
+        "interface_declaration",
+        "method_declaration",
+        "constructor_declaration",
+        "enum_declaration",
+        "struct_declaration",
+        "namespace_declaration",
+    },
+    "php": {
+        "class_declaration",
+        "interface_declaration",
+        "function_definition",
+        "method_declaration",
+        "trait_declaration",
+    },
+    "ruby": {
+        "class",
+        "module",
+        "method",
+        "singleton_method",
+    },
+    "swift": {
+        "class_declaration",
+        "struct_declaration",
+        "protocol_declaration",
+        "function_declaration",
+        "enum_declaration",
+    },
+    "kotlin": {
+        "class_declaration",
+        "interface_declaration",
+        "function_declaration",
+        "object_declaration",
+    },
+    "scala": {
+        "class_definition",
+        "object_definition",
+        "trait_definition",
+        "function_definition",
     },
 }
 
@@ -168,5 +244,11 @@ def is_documentation_comment(node_type: str, language: str) -> bool:
         "rust": {"doc_comment"},
         "cpp": {"block_comment"},
         "c": {"block_comment"},
+        "csharp": {"documentation_comment", "block_comment"},
+        "php": {"block_comment"},
+        "ruby": {"block_comment"},
+        "swift": {"block_comment"},
+        "kotlin": {"block_comment"},
+        "scala": {"block_comment"},
     }
     return node_type in doc_comment_types.get(language, set())

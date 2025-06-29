@@ -84,16 +84,22 @@ SEMANTIC_TYPE_MAPPING = {
     "constructor_declaration": SemanticType.CONSTRUCTOR,
     "enum_declaration": SemanticType.ENUM,
     "annotation_type_declaration": SemanticType.INTERFACE,
+    "record_declaration": SemanticType.CLASS,
 
     # JavaScript/TypeScript
+    "class_declaration": SemanticType.CLASS,
     "function_declaration": SemanticType.FUNCTION,
     "method_definition": SemanticType.METHOD,
     "arrow_function": SemanticType.FUNCTION,
     "function_expression": SemanticType.FUNCTION,
     "generator_function_declaration": SemanticType.FUNCTION,
     "type_alias_declaration": SemanticType.INTERFACE,
+    "interface_declaration": SemanticType.INTERFACE,
+    "enum_declaration": SemanticType.ENUM,
 
     # Go
+    "function_declaration": SemanticType.FUNCTION,
+    "method_declaration": SemanticType.METHOD,
     "type_declaration": SemanticType.CLASS,
     "interface_type": SemanticType.INTERFACE,
     "struct_type": SemanticType.CLASS,
@@ -105,6 +111,7 @@ SEMANTIC_TYPE_MAPPING = {
     "enum_item": SemanticType.ENUM,
     "trait_item": SemanticType.INTERFACE,
     "mod_item": SemanticType.CLASS,
+    "associated_type": SemanticType.INTERFACE,
 
     # C/C++
     "function_definition": SemanticType.FUNCTION,
@@ -114,6 +121,47 @@ SEMANTIC_TYPE_MAPPING = {
     "template_declaration": SemanticType.FUNCTION,
     "union_specifier": SemanticType.CLASS,
     "enum_specifier": SemanticType.ENUM,
+
+    # C#
+    "class_declaration": SemanticType.CLASS,
+    "interface_declaration": SemanticType.INTERFACE,
+    "method_declaration": SemanticType.METHOD,
+    "constructor_declaration": SemanticType.CONSTRUCTOR,
+    "enum_declaration": SemanticType.ENUM,
+    "struct_declaration": SemanticType.CLASS,
+    "namespace_declaration": SemanticType.CLASS,
+
+    # PHP
+    "class_declaration": SemanticType.CLASS,
+    "interface_declaration": SemanticType.INTERFACE,
+    "function_definition": SemanticType.FUNCTION,
+    "method_declaration": SemanticType.METHOD,
+    "trait_declaration": SemanticType.INTERFACE,
+
+    # Ruby
+    "class": SemanticType.CLASS,
+    "module": SemanticType.CLASS,
+    "method": SemanticType.METHOD,
+    "singleton_method": SemanticType.METHOD,
+
+    # Swift
+    "class_declaration": SemanticType.CLASS,
+    "struct_declaration": SemanticType.CLASS,
+    "protocol_declaration": SemanticType.INTERFACE,
+    "function_declaration": SemanticType.FUNCTION,
+    "enum_declaration": SemanticType.ENUM,
+
+    # Kotlin
+    "class_declaration": SemanticType.CLASS,
+    "interface_declaration": SemanticType.INTERFACE,
+    "function_declaration": SemanticType.FUNCTION,
+    "object_declaration": SemanticType.CLASS,
+
+    # Scala
+    "class_definition": SemanticType.CLASS,
+    "object_definition": SemanticType.CLASS,
+    "trait_definition": SemanticType.INTERFACE,
+    "function_definition": SemanticType.FUNCTION,
 }
 
 

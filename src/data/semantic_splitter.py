@@ -39,18 +39,13 @@ from .default_splitter import DefaultSplitter
 def get_parser_for_language(language: str):
     """Get a parser for the given language."""
     try:
-        # Try the new API first
-        lang = get_language(language)
-        if lang is not None:
-            return lang.parser()
+        # Use the get_parser function which handles the correct API
+        parser = get_parser(language)
+        if parser is not None:
+            return parser
         else:
-            # Fallback to old API
-            parser = get_parser(language)
-            if parser is not None:
-                return parser
-            else:
-                logging.warning(f"No parser available for language {language}")
-                return None
+            logging.warning(f"No parser available for language {language}")
+            return None
     except Exception as e:
         logging.warning(f"Failed to create parser for language {language}: {e}")
         return None
@@ -131,6 +126,34 @@ class SemanticSplitter:
 
         # Fallback - should not reach here normally
         return len(source_code.splitlines()) or 1
+
+    def _get_line_boundaries(self, text: str, start_byte: int, end_byte: int) -> tuple[int, int]:
+        """获取包含指定字节范围的完整行边界"""
+        lines = text.splitlines(keepends=True)
+        total_chars = 0
+        start_line_idx = 0
+        end_line_idx = len(lines) - 1
+
+        # 找到开始行
+        for i, line in enumerate(lines):
+            if total_chars + len(line) > start_byte:
+                start_line_idx = i
+                break
+            total_chars += len(line)
+
+        # 找到结束行
+        total_chars = 0
+        for i, line in enumerate(lines):
+            total_chars += len(line)
+            if total_chars >= end_byte:
+                end_line_idx = i
+                break
+
+        # 计算字节位置
+        start_byte_pos = sum(len(lines[i]) for i in range(start_line_idx))
+        end_byte_pos = sum(len(lines[i]) for i in range(end_line_idx + 1))
+
+        return start_byte_pos, end_byte_pos
     
     def _collect_comments_once(self, root_node) -> List:
         """一次性收集所有注释节点，按位置排序"""
@@ -150,20 +173,33 @@ class SemanticSplitter:
         """为特定语义节点查找关联的注释"""
         associated_comments = []
         semantic_start = semantic_node.start_byte
+        semantic_start_line = self._get_line_number(text, semantic_start)
 
         # 只检查语义节点之前的注释
         for comment in all_comments:
             if comment.end_byte > semantic_start:
                 break  # 注释已排序，后面的都在语义节点之后
 
+            comment_end_line = self._get_line_number(text, comment.end_byte)
+            lines_between = semantic_start_line - comment_end_line
+
             # 检查距离和关联性
             between_text = text[comment.end_byte:semantic_start].strip()
 
-            if not between_text and is_documentation_comment(comment.type, self.language):
-                associated_comments.append(comment)
-            elif semantic_start - comment.end_byte < self.config.comment_distance_threshold:
-                lines_between = text[comment.end_byte:semantic_start].count('\n')
-                if lines_between <= self.config.max_lines_between_comment:
+            # 文档注释：紧邻或只有空白行分隔
+            if is_documentation_comment(comment.type, self.language):
+                if lines_between <= 1 or (lines_between <= 2 and not between_text):
+                    associated_comments.append(comment)
+            # 普通注释：更严格的距离限制
+            elif lines_between <= self.config.max_lines_between_comment:
+                # 检查中间是否只有空白或其他注释
+                between_lines = text[comment.end_byte:semantic_start].split('\n')
+                non_empty_lines = [line.strip() for line in between_lines if line.strip()]
+
+                # 如果中间只有空行或注释，则关联
+                if not non_empty_lines or all(
+                    line.startswith(('//','#','/*','*','"','\'')) for line in non_empty_lines
+                ):
                     associated_comments.append(comment)
 
         return associated_comments
@@ -203,10 +239,11 @@ class SemanticSplitter:
         traverse(root_node)
         return sorted(chunks, key=lambda c: c.span.start)
 
-    def _create_span_with_comments(self, chunk: SemanticChunk) -> Span:
-        """创建包含注释的span"""
+    def _create_span_with_comments(self, chunk: SemanticChunk, text: str) -> Span:
+        """创建包含注释的span，按行边界对齐"""
         if not chunk.associated_comments:
-            return chunk.span
+            # 即使没有注释，也要按行边界对齐
+            return self._align_to_line_boundaries(chunk.span, text)
 
         # 找到最早的注释开始和最晚的结束
         min_start = min(comment.start_byte for comment in chunk.associated_comments)
@@ -214,10 +251,16 @@ class SemanticSplitter:
         max_end = max(chunk.span.end,
                      max(comment.end_byte for comment in chunk.associated_comments))
 
-        return Span(min_start, max_end)
+        # 按行边界对齐
+        return self._align_to_line_boundaries(Span(min_start, max_end), text)
 
-    def _merge_group(self, group: List[SemanticChunk]) -> List[Span]:
-        """合并一组语义块"""
+    def _align_to_line_boundaries(self, span: Span, text: str) -> Span:
+        """将span对齐到行边界"""
+        start_byte, end_byte = self._get_line_boundaries(text, span.start, span.end)
+        return Span(start_byte, end_byte)
+
+    def _merge_group(self, group: List[SemanticChunk], text: str) -> List[Span]:
+        """合并一组语义块，按行边界对齐"""
         if not group:
             return []
 
@@ -238,7 +281,9 @@ class SemanticSplitter:
             comment_start = min(c.start_byte for c in all_comments)
             start = min(start, comment_start)
 
-        return [Span(start, end)]
+        # 按行边界对齐
+        aligned_span = self._align_to_line_boundaries(Span(start, end), text)
+        return [aligned_span]
 
     def _merge_by_priority(self, semantic_chunks: List[SemanticChunk], text: str) -> List[Span]:
         """第二阶段：按优先级和大小智能合并"""
@@ -258,12 +303,12 @@ class SemanticSplitter:
 
                 # 先处理当前组
                 if current_group:
-                    merged_spans.extend(self._merge_group(current_group))
+                    merged_spans.extend(self._merge_group(current_group, text))
                     current_group = []
                     current_size = 0
 
                 # 高优先级块独立
-                merged_spans.append(self._create_span_with_comments(chunk))
+                merged_spans.append(self._create_span_with_comments(chunk, text))
 
             # 可以合并的块
             elif current_size + chunk_size <= self.config.chunk_size:
@@ -273,14 +318,14 @@ class SemanticSplitter:
             # 当前组已满，开始新组
             else:
                 if current_group:
-                    merged_spans.extend(self._merge_group(current_group))
+                    merged_spans.extend(self._merge_group(current_group, text))
 
                 current_group = [chunk]
                 current_size = chunk_size
 
         # 处理最后一组
         if current_group:
-            merged_spans.extend(self._merge_group(current_group))
+            merged_spans.extend(self._merge_group(current_group, text))
 
         return merged_spans
 
